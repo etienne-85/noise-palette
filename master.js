@@ -102,109 +102,153 @@ function gradient_at(master_seed, x, y) {
     return new Vect2(0, 1).rot(prng * 2 * Math.PI);
 }
 
-function update() {
-    let canvas = document.getElementById("canvas");
-    let width = 512;
-    let height = 512;
-    canvas.width = width;
-    canvas.height = height;
-    let context = canvas.getContext("2d");
-    let imagedata = new ImageData(width, height);
+class Controller {
     
-    let scale = 64;
-    let draw_corners = false;
-    let draw_gradient = false;
-    
-    let noise_grid = [];
-    let noise_grid_width = Math.floor(width / scale) + 2;
-    let noise_grid_height = Math.floor(height / scale) + 2;
-    
-    let seed = Math.random() * (2 ** 30);
-    
-    for (let i = 0; i < noise_grid_height; i++) {
-        noise_grid.push([]);
-        for (let j = 0; j < noise_grid_width; j++) {
-            noise_grid[i].push(gradient_at(seed, j, i));
-        }
-    }
-    
-    let vals = [];
-
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            let i = y / scale;
-            let j = x / scale;
-            let cell_i = Math.floor(i);
-            let cell_j = Math.floor(j);
-            let corners = [
-                [cell_i, cell_j, 0],
-                [cell_i + 1, cell_j, 0],
-                [cell_i, cell_j + 1, 0],
-                [cell_i + 1, cell_j + 1, 0]
-            ];
-            for (let k = 0; k < 4; k++) {
-                let offset = new Vect2(j - corners[k][1], i - corners[k][0]);
-                corners[k][2] = offset.dot(noise_grid[corners[k][0]][corners[k][1]]);
-            }
-
-            let itop = interp(i - cell_i, corners[0][2], corners[1][2]);
-            let ibottom = interp(i - cell_i, corners[2][2], corners[3][2]);
-            let ixy = interp(j - cell_j, itop, ibottom);
-
-            // let color = [255, 255, 255];
-            // if (ixy >= 0) {
-            //     color = lerpa(ixy, [255, 255, 255], [0, 61, 24]);
-            // } else {
-            //     color = lerpa(-ixy, [255, 255, 255], [64, 0, 75]);
-            // }
-            let color = [255 * (ixy + 1) / 2, 255 * (ixy + 1) / 2, 255 * (ixy + 1) / 2];
-
-            vals.push(ixy);
-
-            let pxk = ((y * width) + x) * 4;
-            imagedata.data[pxk] = color[0];
-            imagedata.data[pxk + 1] = color[1];
-            imagedata.data[pxk + 2] = color[2];
-            imagedata.data[pxk + 3] = 255;
+    constructor(config) {
+        this.noises = [];
+        this.config = {
+            width: 512,
+            height: 512
+        };
+        for (let key in config) {
+            this.config[key] = config[key];
         }
     }
 
-    context.putImageData(imagedata, 0, 0);
+    setup() {
+        let panels_container = document.getElementById("panels");
+        let default_noise = new PerlinNoise(this, {});
+        default_noise.setup(panels_container);
+        this.noises.push(default_noise);
+    }
 
-    if (draw_corners) {
-        context.fillStyle = "blue";
-        for (let i = 0; i < noise_grid_height; i++) {
-            for (let j = 0; j < noise_grid_width; j++) {
-                let x = j * scale;
-                let y = i * scale;
-                context.beginPath();
-                context.arc(x, y, scale * 0.05, 0, 2 * Math.PI);
-                context.fill();
+    update() {
+        this.noises.forEach(noise => { noise.update(); });
+    }
+
+}
+
+class PerlinNoise {
+
+    constructor(controller, config) {
+        this.controller = controller;
+        this.canvas = null;
+        this.context = null;
+        this.gradients = null;
+        this.values = null;
+        this.width = this.controller.config.width;
+        this.height = this.controller.config.height;
+        this.config = {
+            seed: Math.floor(Math.random() * (2 ** 30)),
+            scale: 64,
+            draw_grid: false,
+        }
+        for (let key in config) {
+            this.config[key] = config[key];
+        }
+    }
+
+    create_dom_element(container) {
+        let panel = document.createElement("div");
+        panel.classList.add("panel");
+        this.canvas = document.createElement("canvas");
+        this.canvas.width = this.width;
+        this.canvas.height = this.height;
+        panel.appendChild(this.canvas);
+        this.context = this.canvas.getContext("2d");
+        container.appendChild(panel);
+    }
+
+    setup(container) {
+        this.create_dom_element(container);
+    }
+
+    update_gradients() {
+        this.gradients = [];
+        let grid_width = Math.floor(this.width / this.config.scale) + 2;
+        let grid_height = Math.floor(this.height / this.config.scale) + 2;
+        for (let y = 0; y < grid_height; y++) {
+            this.gradients.push([]);
+            for (let x = 0; x < grid_width; x++) {
+                this.gradients[y].push(gradient_at(this.config.seed, x, y));
             }
         }
     }
 
-    if (draw_gradient) {
-        context.strokeStyle = "red";
-        context.lineWidth = 1;
-        for (let i = 0; i < noise_grid_height; i++) {
-            for (let j = 0; j < noise_grid_width; j++) {
-                let x = j * scale;
-                let y = i * scale;
+    update_values() {
+        this.values = [];
+        for (let py = 0; py < this.height; py++) {
+            this.values.push([]);
+            for (let px = 0; px < this.width; px++) {
+                let x = px / this.config.scale;
+                let y = py / this.config.scale;
+                let x0 = Math.floor(x);
+                let y0 = Math.floor(y);
+                let x1 = x0 + 1;
+                let y1 = y0 + 1;
+                let dot_ul = this.gradients[y0][x0].dot(new Vect2(x - x0, y - y0));
+                let dot_bl = this.gradients[y1][x0].dot(new Vect2(x - x0, y - y1));
+                let il = interp(y - y0, dot_ul, dot_bl);
+                let dot_ur = this.gradients[y0][x1].dot(new Vect2(x - x1, y - y0));
+                let dot_br = this.gradients[y1][x1].dot(new Vect2(x - x1, y - y1));
+                let ir = interp(y - y0, dot_ur, dot_br);
+                let i = (interp(x - x0, il, ir) * 0.5) + 0.5;
+                this.values[py].push(i);
+            }
+        }
+    }
+
+    draw_grid() {
+        this.context.fillStyle = "blue";
+        this.context.strokeStyle = "red";
+        this.context.lineWidth = 1;
+        let grid_width = Math.floor(this.width / this.config.scale) + 2;
+        let grid_height = Math.floor(this.height / this.config.scale) + 2;
+        for (let i = 0; i < grid_height; i++) {
+            for (let j = 0; j < grid_width; j++) {
+                let x = j * this.config.scale;
+                let y = i * this.config.scale;
+                this.context.beginPath();
+                this.context.arc(x, y, this.config.scale * 0.05, 0, 2 * Math.PI);
+                this.context.fill();
                 let origin = new Vect2(x, y);
-                let gradient = new Vect2(noise_grid[i][j].x * scale * 0.5, noise_grid[i][j].y * scale * 0.5);
-                draw_arrow(context, origin, gradient);
+                let gradient = new Vect2(this.gradients[i][j].x * this.config.scale * 0.5, this.gradients[i][j].y * this.config.scale * 0.5);
+                draw_arrow(this.context, origin, gradient);
             }
+        }
+    }
+
+    update_canvas() {
+        let imagedata = new ImageData(this.width, this.height);
+        for (let py = 0; py < this.height; py++) {
+            for (let px = 0; px < this.width; px++) {
+                let k = ((py * this.width) + px) * 4;
+                let noise = this.values[py][px];
+                imagedata.data[k] = 255 * noise;
+                imagedata.data[k + 1] = 255 * noise;
+                imagedata.data[k + 2] = 255 * noise;
+                imagedata.data[k + 3] = 255;
+            }
+        }
+        this.context.putImageData(imagedata, 0, 0);
+    }
+
+    update() {
+        this.update_gradients();
+        this.update_values();
+        this.update_canvas();
+        if (this.config.draw_grid) {
+            this.draw_grid();
         }
     }
 
 }
 
-
 function on_load() {
     console.log("Hello, World!");
-    document.getElementById("button-refresh").addEventListener("click", update);
-    update();
+    let controller = new Controller();
+    controller.setup();
+    controller.update();
 }
 
 window.addEventListener("load", on_load);
