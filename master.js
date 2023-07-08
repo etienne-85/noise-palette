@@ -217,7 +217,6 @@ class PerlinNoise {
         this.canvas.height = this.height;
         panel.appendChild(this.canvas);
         this.context = this.canvas.getContext("2d");
-        container.appendChild(panel);
         let panel_inputs = document.createElement("div");
         panel_inputs.classList.add("panel-inputs");
         this.inputs.push(new RangeParameterInput(this, "seed", "Seed", 1, 1000, 1, 500, this.config.seed));
@@ -225,7 +224,8 @@ class PerlinNoise {
         this.inputs.forEach(input => {
             input.setup(panel_inputs);
         });
-        container.appendChild(panel_inputs);
+        panel.appendChild(panel_inputs);
+        container.appendChild(panel);
     }
 
     setup(container) {
