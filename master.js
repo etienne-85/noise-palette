@@ -63,19 +63,15 @@ function is_integer(x) {
     return x % 1 === 0;
 }
 
-function lerp(t, left, right) {
-    return (1 - t) * left + t * right;
+function interp_linear(t, x0, x1) {
+    return (1 - t) * x0 + t * x1;
 }
 
-function lerpa(t, left, right) {
-    let result = [];
-    for (let k = 0; k < left.length; k++) {
-        result.push(lerp(t, left[k], right[k]));
-    }
-    return result;
+function interp_smooth(t, x0, x1) {
+    return (x1 - x0) * (3.0 - t * 2.0) * t * t + x0;
 }
 
-function interp(t, x0, x1) {
+function interp_smoother(t, x0, x1) {
     return (x1 - x0) * ((t * (t * 6.0 - 15.0) + 10.0) * t * t * t) + x0;
 }
 
@@ -124,22 +120,21 @@ class RangeParameterInput {
         let wrapper = document.createElement("div");
         wrapper.classList.add("panel-input");
         wrapper.classList.add("panel-input-range");
-        let input = document.createElement("input");
-        input.id = `input-${this.reference.get_input_id()}`;
-        input.type = "range";
-        input.min = this.min;
-        input.max = this.max;
-        input.step = this.step;
-        input.value = this.current;
+        this.element = document.createElement("input");
+        this.element.id = `input-${this.reference.get_input_id()}`;
+        this.element.type = "range";
+        this.element.min = this.min;
+        this.element.max = this.max;
+        this.element.step = this.step;
+        this.element.value = this.reference.config[this.name];
         let label = document.createElement("label");
-        label.for = `input-${input.id}`;
+        label.setAttribute("for", this.element.id);
         label.textContent = this.label;
         wrapper.appendChild(label);
-        wrapper.appendChild(input);
+        wrapper.appendChild(this.element);
         container.appendChild(wrapper);
-        this.element = input;
         var self = this;
-        input.addEventListener("input", () => {self.update()});
+        this.element.addEventListener("input", () => {self.update()});
     }
 
     update() {
@@ -153,6 +148,53 @@ class RangeParameterInput {
         this.reference.on_input_update();
     }
 
+}
+
+class SelectParameterInput {
+    constructor(reference, name, label, options, current) {
+        this.reference = reference;
+        this.name = name;
+        this.label = label;
+        this.options = options;
+        this.current = current;
+        this.element = null;
+    }
+
+    setup(container) {
+        let wrapper = document.createElement("div");
+        wrapper.classList.add("panel-input");
+        wrapper.classList.add("panel-input-range");
+        this.element = document.createElement("select");
+        this.element.id = `input-${this.reference.get_input_id()}`;
+        this.options.forEach(option_text => {
+            let option = document.createElement("option");
+            option.value = option_text;
+            option.textContent = option_text;
+            if (option_text == this.reference.config[this.name]) {
+                option.selected = true;
+            }
+            this.element.appendChild(option);
+        });
+        let label = document.createElement("label");
+        label.setAttribute("for", this.element.id);
+        label.textContent = this.label;
+        wrapper.appendChild(label);
+        wrapper.appendChild(this.element);
+        container.appendChild(wrapper);
+        var self = this;
+        this.element.addEventListener("input", () => {self.update()});
+    }
+
+    update() {
+        let new_value = "";
+        this.element.querySelectorAll("option").forEach(option => {
+            if (option.selected) {
+                new_value = option.value;
+            }
+        });
+        this.reference.config[this.name] = new_value;
+        this.reference.on_input_update();
+    }
 }
 
 class Controller {
@@ -201,6 +243,7 @@ class PerlinNoise {
         this.config = {
             seed: Math.floor(Math.random() * (2 ** 30)),
             scale: 64,
+            interpolation: "smoother",
             draw_grid: false,
         }
         for (let key in config) {
@@ -219,8 +262,9 @@ class PerlinNoise {
         this.context = this.canvas.getContext("2d");
         let panel_inputs = document.createElement("div");
         panel_inputs.classList.add("panel-inputs");
-        this.inputs.push(new RangeParameterInput(this, "seed", "Seed", 1, 1000, 1, 500, this.config.seed));
-        this.inputs.push(new RangeParameterInput(this, "scale", "Scale", 8, 512, 1, 64, this.config.scale));
+        this.inputs.push(new RangeParameterInput(this, "seed", "Seed", 1, 1000, 1, 500));
+        this.inputs.push(new RangeParameterInput(this, "scale", "Scale", 8, 512, 1, 64));
+        this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", ["linear", "smooth", "smoother"]));
         this.inputs.forEach(input => {
             input.setup(panel_inputs);
         });
@@ -245,6 +289,14 @@ class PerlinNoise {
     }
 
     update_values() {
+        let interp = null;
+        if (this.config.interpolation == "linear") {
+            interp = interp_linear;
+        } else if (this.config.interpolation == "smooth") {
+            interp = interp_smooth;
+        } else if (this.config.interpolation == "smoother") {
+            interp = interp_smoother;
+        }
         this.values = [];
         for (let py = 0; py < this.height; py++) {
             this.values.push([]);
