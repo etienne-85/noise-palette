@@ -58,6 +58,11 @@ function draw_arrow(context, origin, gradient, tip=0.2, theta=3*Math.PI/4) {
     context.stroke();
 }
 
+function is_integer(x) {
+    // Assumes x is a number
+    return x % 1 === 0;
+}
+
 function lerp(t, left, right) {
     return (1 - t) * left + t * right;
 }
@@ -102,6 +107,54 @@ function gradient_at(master_seed, x, y) {
     return new Vect2(0, 1).rot(prng * 2 * Math.PI);
 }
 
+class RangeParameterInput {
+    constructor(reference, name, label, min, max, step, default_, current) {
+        this.reference = reference;
+        this.name = name;
+        this.label = label;
+        this.min = min;
+        this.max = max;
+        this.step = step;
+        this.default = default_;
+        this.current = current;
+        this.element = null;
+    }
+
+    setup(container) {
+        let wrapper = document.createElement("div");
+        wrapper.classList.add("panel-input");
+        wrapper.classList.add("panel-input-range");
+        let input = document.createElement("input");
+        input.id = `input-${this.reference.get_input_id()}`;
+        input.type = "range";
+        input.min = this.min;
+        input.max = this.max;
+        input.step = this.step;
+        input.value = this.current;
+        let label = document.createElement("label");
+        label.for = `input-${input.id}`;
+        label.textContent = this.label;
+        wrapper.appendChild(label);
+        wrapper.appendChild(input);
+        container.appendChild(wrapper);
+        this.element = input;
+        var self = this;
+        input.addEventListener("input", () => {self.update()});
+    }
+
+    update() {
+        let new_value = 0;
+        if (is_integer(this.step)) {
+            new_value = parseInt(this.element.value);
+        } else {
+            new_value = parseFloat(this.element.value);
+        }
+        this.reference.config[this.name] = new_value;
+        this.reference.on_input_update();
+    }
+
+}
+
 class Controller {
     
     constructor(config) {
@@ -113,6 +166,7 @@ class Controller {
         for (let key in config) {
             this.config[key] = config[key];
         }
+        this.input_counter = 0;
     }
 
     setup() {
@@ -126,6 +180,11 @@ class Controller {
         this.noises.forEach(noise => { noise.update(); });
     }
 
+    get_input_id() {
+        this.input_counter++;
+        return this.input_counter;
+    }
+
 }
 
 class PerlinNoise {
@@ -134,6 +193,7 @@ class PerlinNoise {
         this.controller = controller;
         this.canvas = null;
         this.context = null;
+        this.inputs = [];
         this.gradients = null;
         this.values = null;
         this.width = this.controller.config.width;
@@ -152,11 +212,20 @@ class PerlinNoise {
         let panel = document.createElement("div");
         panel.classList.add("panel");
         this.canvas = document.createElement("canvas");
+        this.canvas.classList.add("panel-canvas");
         this.canvas.width = this.width;
         this.canvas.height = this.height;
         panel.appendChild(this.canvas);
         this.context = this.canvas.getContext("2d");
         container.appendChild(panel);
+        let panel_inputs = document.createElement("div");
+        panel_inputs.classList.add("panel-inputs");
+        this.inputs.push(new RangeParameterInput(this, "seed", "Seed", 1, 1000, 1, 500, this.config.seed));
+        this.inputs.push(new RangeParameterInput(this, "scale", "Scale", 8, 512, 1, 64, this.config.scale));
+        this.inputs.forEach(input => {
+            input.setup(panel_inputs);
+        });
+        container.appendChild(panel_inputs);
     }
 
     setup(container) {
@@ -240,6 +309,14 @@ class PerlinNoise {
         if (this.config.draw_grid) {
             this.draw_grid();
         }
+    }
+
+    get_input_id() {
+        return this.controller.get_input_id();
+    }
+
+    on_input_update() {
+        this.controller.update();
     }
 
 }
