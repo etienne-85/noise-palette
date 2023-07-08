@@ -46,7 +46,6 @@ class Vect2 {
 
 }
 
-
 function draw_arrow(context, origin, gradient, tip=0.2, theta=3*Math.PI/4) {
     let arrow_down = gradient.rot(-theta).mult(tip);
     let arrow_up = gradient.rot(theta).mult(tip);
@@ -57,11 +56,6 @@ function draw_arrow(context, origin, gradient, tip=0.2, theta=3*Math.PI/4) {
     context.moveTo(origin.x + gradient.x, origin.y + gradient.y);
     context.lineTo(origin.x + gradient.x + arrow_up.x, origin.y + gradient.y + arrow_up.y);
     context.stroke();
-}
-
-
-function sample_noise(x, y) {
-    return Math.random() * 255;
 }
 
 function lerp(t, left, right) {
@@ -80,6 +74,34 @@ function interp(t, x0, x1) {
     return (x1 - x0) * ((t * (t * 6.0 - 15.0) + 10.0) * t * t * t) + x0;
 }
 
+function spiral_index(x, y) {
+    /** @see https://superzhu.gitbooks.io/bigdata/content/algo/get_spiral_index_from_location.html */
+    let index = 0;
+    if (x * x >= y * y) {
+        index = 4 * x * x  - x - y;
+        if (x < y) {
+            index -= 2 * (x - y);
+        }
+    } else {
+        index = 4 * y * y - x - y;
+        if (x < y) {
+            index += 2 * (x - y);
+        }
+    }
+    return index;
+}
+
+function seed_at(master_seed, x, y) {
+    return master_seed + spiral_index(x, y);
+}
+
+function gradient_at(master_seed, x, y) {
+    /** @see https://github.com/davidbau/seedrandom */
+    let local_seed = seed_at(master_seed, x, y);
+    let prng = (new Math.seedrandom(local_seed))();
+    return new Vect2(0, 1).rot(prng * 2 * Math.PI);
+}
+
 function update() {
     let canvas = document.getElementById("canvas");
     let width = 512;
@@ -96,12 +118,13 @@ function update() {
     let noise_grid = [];
     let noise_grid_width = Math.floor(width / scale) + 2;
     let noise_grid_height = Math.floor(height / scale) + 2;
+    
+    let seed = Math.random() * (2 ** 30);
+    
     for (let i = 0; i < noise_grid_height; i++) {
         noise_grid.push([]);
         for (let j = 0; j < noise_grid_width; j++) {
-            // let gradient = new Vect2(Math.random() - 0.5, Math.random() - 0.5);
-            let gradient = new Vect2(0, 1).rot(Math.random() * 2 * Math.PI);
-            noise_grid[i].push(gradient.unit());
+            noise_grid[i].push(gradient_at(seed, j, i));
         }
     }
     
