@@ -104,7 +104,7 @@ function gradient_at(master_seed, x, y) {
 }
 
 class RangeParameterInput {
-    constructor(reference, name, label, min, max, step, default_, current) {
+    constructor(reference, name, label, min, max, step, default_) {
         this.reference = reference;
         this.name = name;
         this.label = label;
@@ -112,7 +112,6 @@ class RangeParameterInput {
         this.max = max;
         this.step = step;
         this.default = default_;
-        this.current = current;
         this.element = null;
     }
 
@@ -151,19 +150,18 @@ class RangeParameterInput {
 }
 
 class SelectParameterInput {
-    constructor(reference, name, label, options, current) {
+    constructor(reference, name, label, options) {
         this.reference = reference;
         this.name = name;
         this.label = label;
         this.options = options;
-        this.current = current;
         this.element = null;
     }
 
     setup(container) {
         let wrapper = document.createElement("div");
         wrapper.classList.add("panel-input");
-        wrapper.classList.add("panel-input-range");
+        wrapper.classList.add("panel-input-select");
         this.element = document.createElement("select");
         this.element.id = `input-${this.reference.get_input_id()}`;
         this.options.forEach(option_text => {
@@ -192,6 +190,41 @@ class SelectParameterInput {
                 new_value = option.value;
             }
         });
+        this.reference.config[this.name] = new_value;
+        this.reference.on_input_update();
+    }
+}
+
+class BooleanParameterInput {
+    constructor(reference, name, label) {
+        this.reference = reference;
+        this.name = name;
+        this.label = label;
+        this.element = null;
+    }
+
+    setup(container) {
+        let wrapper = document.createElement("div");
+        wrapper.classList.add("panel-input");
+        wrapper.classList.add("panel-input-boolean");
+        this.element = document.createElement("input");
+        this.element.id = `input-${this.reference.get_input_id()}`;
+        this.element.type = "checkbox";
+        if (this.reference.config[this.name]) {
+            this.element.checked = true;
+        }
+        let label = document.createElement("label");
+        label.setAttribute("for", this.element.id);
+        label.textContent = this.label;
+        wrapper.appendChild(this.element);
+        wrapper.appendChild(label);
+        container.appendChild(wrapper);
+        var self = this;
+        this.element.addEventListener("input", () => {self.update()});
+    }
+
+    update() {
+        let new_value = this.element.checked;
         this.reference.config[this.name] = new_value;
         this.reference.on_input_update();
     }
@@ -265,6 +298,7 @@ class PerlinNoise {
         this.inputs.push(new RangeParameterInput(this, "seed", "Seed", 1, 1000, 1, 500));
         this.inputs.push(new RangeParameterInput(this, "scale", "Scale", 8, 512, 1, 64));
         this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", ["linear", "smooth", "smoother"]));
+        this.inputs.push(new BooleanParameterInput(this, "draw_grid", "Draw grid"));
         this.inputs.forEach(input => {
             input.setup(panel_inputs);
         });
