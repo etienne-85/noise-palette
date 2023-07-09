@@ -323,12 +323,12 @@ class SeedParameterInput extends ParameterInput {
 class Controller {
     
     constructor(config) {
-        this.noises = [];
+        this.noise_panels = [];
         this.config = {
             width: 400,
             height: 400
         };
-        this.output = new Output(this, {});
+        this.output_panel = new OutputPanel(this);
         for (let key in config) {
             this.config[key] = config[key];
         }
@@ -337,17 +337,15 @@ class Controller {
 
     setup() {
         let panels_container = document.getElementById("panels");
-        this.noises.push(new PerlinNoise(this, {}));
-        this.noises.push(new PerlinNoise(this, {}));
-        this.noises.forEach(noise => {
-            noise.setup(panels_container);
+        this.noise_panels.forEach(panel => {
+            panel.setup(panels_container);
         });
-        this.output.setup(panels_container);
+        this.output_panel.setup(panels_container);
     }
 
     update() {
-        this.noises.forEach(noise => { noise.update(); });
-        this.output.update();
+        this.noise_panels.forEach(panel => { panel.update(); });
+        this.output_panel.update();
     }
 
     get_input_id() {
@@ -652,12 +650,77 @@ class SplineParameterInput extends ParameterInput {
 
 class PerlinNoise {
 
-    constructor(controller, config) {
+    constructor(width, height, seed, scale, interpolation) {
+        this.width = width;
+        this.height = height;
+        this.seed = seed;
+        this.scale = scale;
+        this.interpolation = interpolation;
+        this.gradients = null;
+        this.values = null;
+    }
+
+    compute_gradients() {
+        this.gradients = [];
+        let jstart = Math.floor(-this.width / 2 / this.scale) - 1;
+        let jend = Math.floor(this.width / 2 / this.scale) + 1;
+        let istart = Math.floor(-this.height / 2 / this.scale) - 1;
+        let iend = Math.floor(this.height / 2 / this.scale) + 1;
+        for (let i = istart; i <= iend; i++) {
+            this.gradients.push([]);
+            for (let j = jstart; j <= jend; j++) {
+                this.gradients[i - istart].push(gradient_at(this.seed, j, i));
+            }
+        }
+    }
+
+    compute_values() {
+        let interp = null;
+        if (this.interpolation == "linear") {
+            interp = interp_linear;
+        } else if (this.interpolation == "smooth") {
+            interp = interp_smooth;
+        } else if (this.interpolation == "smoother") {
+            interp = interp_smoother;
+        }
+        this.values = [];
+        let jstart = Math.floor(-this.width / 2 / this.scale) - 1;
+        let istart = Math.floor(-this.height / 2 / this.scale) - 1;
+        for (let py = 0; py < this.height; py++) {
+            this.values.push([]);
+            for (let px = 0; px < this.width; px++) {
+                let j = (px - this.width / 2) / this.scale - jstart;
+                let i = (py - this.height / 2) / this.scale - istart;
+                let j0 = Math.floor(j);
+                let i0 = Math.floor(i);
+                let j1 = j0 + 1;
+                let i1 = i0 + 1;
+                let dot_ul = this.gradients[i0][j0].dot(new Vect2(j - j0, i - i0));
+                let dot_bl = this.gradients[i1][j0].dot(new Vect2(j - j0, i - i1));
+                let interp_left = interp(i - i0, dot_ul, dot_bl);
+                let dot_ur = this.gradients[i0][j1].dot(new Vect2(j - j1, i - i0));
+                let dot_br = this.gradients[i1][j1].dot(new Vect2(j - j1, i - i1));
+                let interp_right = interp(i - i0, dot_ur, dot_br);
+                let interp_vert = (interp(j - j0, interp_left, interp_right) * 0.5) + 0.5;
+                this.values[py].push(interp_vert);
+            }
+        }
+    }
+
+    compute() {
+        this.compute_gradients();
+        this.compute_values();
+    }
+
+}
+
+class NoisePanel {
+
+    constructor(controller, config={}) {
         this.controller = controller;
         this.canvas = null;
         this.context = null;
         this.inputs = [];
-        this.gradients = null;
         this.values = null;
         this.width = this.controller.config.width;
         this.height = this.controller.config.height;
@@ -665,8 +728,10 @@ class PerlinNoise {
             seed: random_seed(),
             scale: 64,
             interpolation: "smoother",
-            draw_grid: false,
             spline: [[0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1]],
+            harmonics: 0,
+            harmonic_spread: 2,
+            harmonic_gain: 0.5,
         }
         for (let key in config) {
             this.config[key] = config[key];
@@ -687,8 +752,10 @@ class PerlinNoise {
         panel_inputs.classList.add("panel-inputs");
         this.inputs.push(new SeedParameterInput(this, "seed", "Seed"));
         this.inputs.push(new RangeParameterInput(this, "scale", "Scale", 64, 8, 512, 1));
+        this.inputs.push(new RangeParameterInput(this, "harmonics", "Harmonics", 0, 0, 4, 1));
+        this.inputs.push(new RangeParameterInput(this, "harmonic_spread", "Harmonic Spread", 2, 0, 4, 0.01));
+        this.inputs.push(new RangeParameterInput(this, "harmonic_gain", "Harmonic Gain", 1, 0, 2, 0.01));
         this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", ["linear", "smooth", "smoother"]));
-        this.inputs.push(new BooleanParameterInput(this, "draw_grid", "Draw grid"));
         this.inputs.push(new SplineParameterInput(this, "spline", "Spline"));
         this.inputs.forEach(input => {
             input.setup(panel_inputs);
@@ -697,74 +764,31 @@ class PerlinNoise {
         container.appendChild(panel);
     }
 
-    update_gradients() {
-        this.gradients = [];
-        let jstart = Math.floor(-this.width / 2 / this.config.scale) - 1;
-        let jend = Math.floor(this.width / 2 / this.config.scale) + 1;
-        let istart = Math.floor(-this.height / 2 / this.config.scale) - 1;
-        let iend = Math.floor(this.height / 2 / this.config.scale) + 1;
-        for (let i = istart; i <= iend; i++) {
-            this.gradients.push([]);
-            for (let j = jstart; j <= jend; j++) {
-                this.gradients[i - istart].push(gradient_at(this.config.seed, j, i));
-            }
-        }
-    }
-
     update_values() {
-        let interp = null;
-        if (this.config.interpolation == "linear") {
-            interp = interp_linear;
-        } else if (this.config.interpolation == "smooth") {
-            interp = interp_smooth;
-        } else if (this.config.interpolation == "smoother") {
-            interp = interp_smoother;
+        let spline = new Spline(this.config.spline);
+        let scale = this.config.scale;
+        let amplitude = 1;
+        let total_amplitude = 0;
+        let harmonics = [];
+        for (let k = 0; k <= this.config.harmonics; k++) {
+            let harmonic = new PerlinNoise(this.width, this.height, this.config.seed * (k + 1), scale, this.config.interpolation);
+            harmonic.compute();
+            harmonics.push(harmonic);
+            scale /= this.config.harmonic_spread;
+            total_amplitude += amplitude;
+            amplitude *= this.config.harmonic_gain;
         }
         this.values = [];
-        let jstart = Math.floor(-this.width / 2 / this.config.scale) - 1;
-        let istart = Math.floor(-this.height / 2 / this.config.scale) - 1;
-        let spline = new Spline(this.config.spline);
-        for (let py = 0; py < this.height; py++) {
+        for (let i = 0; i < this.height; i++) {
             this.values.push([]);
-            for (let px = 0; px < this.width; px++) {
-                let j = (px - this.width / 2) / this.config.scale - jstart;
-                let i = (py - this.height / 2) / this.config.scale - istart;
-                let j0 = Math.floor(j);
-                let i0 = Math.floor(i);
-                let j1 = j0 + 1;
-                let i1 = i0 + 1;
-                let dot_ul = this.gradients[i0][j0].dot(new Vect2(j - j0, i - i0));
-                let dot_bl = this.gradients[i1][j0].dot(new Vect2(j - j0, i - i1));
-                let interp_left = interp(i - i0, dot_ul, dot_bl);
-                let dot_ur = this.gradients[i0][j1].dot(new Vect2(j - j1, i - i0));
-                let dot_br = this.gradients[i1][j1].dot(new Vect2(j - j1, i - i1));
-                let interp_right = interp(i - i0, dot_ur, dot_br);
-                let interp_vert = (interp(j - j0, interp_left, interp_right) * 0.5) + 0.5;
-                let interp_splined = spline.eval(interp_vert);
-                this.values[py].push(interp_splined);
-            }
-        }
-    }
-
-    draw_grid() {
-        this.context.fillStyle = "blue";
-        this.context.strokeStyle = "red";
-        this.context.lineWidth = 1;
-        this.context.textAlign = "center";
-        let jstart = Math.floor(-this.width / 2 / this.config.scale) - 1;
-        let jend = Math.floor(this.width / 2 / this.config.scale) + 1;
-        let istart = Math.floor(-this.height / 2 / this.config.scale) - 1;
-        let iend = Math.floor(this.height / 2 / this.config.scale) + 1;
-        for (let i = istart; i <= iend; i++) {
-            for (let j = jstart; j <= jend; j++) {
-                let x = j * this.config.scale + this.width / 2;
-                let y = i * this.config.scale + this.height / 2;
-                this.context.beginPath();
-                this.context.arc(x, y, this.config.scale * 0.05, 0, 2 * Math.PI);
-                this.context.fill();
-                let origin = new Vect2(x, y);
-                let gradient = this.gradients[i - istart][j - jstart].copy().mult(this.config.scale * 0.5);
-                draw_arrow(this.context, origin, gradient);
+            for (let j = 0; j < this.width; j++) {
+                this.values[i].push(0);
+                amplitude = 1;
+                harmonics.forEach(harmonic => {
+                    this.values[i][j] += amplitude * harmonic.values[i][j];
+                    amplitude *= this.config.harmonic_gain;
+                });
+                this.values[i][j] = spline.eval(this.values[i][j] / total_amplitude);
             }
         }
     }
@@ -785,7 +809,6 @@ class PerlinNoise {
     }
 
     update() {
-        this.update_gradients();
         this.update_values();
         this.update_canvas();
         if (this.config.draw_grid) {
@@ -803,9 +826,9 @@ class PerlinNoise {
 
 }
 
-class Output {
+class OutputPanel {
 
-    constructor(controller, config) {
+    constructor(controller, config={}) {
         this.controller = controller;
         this.canvas = null;
         this.context = null;
@@ -844,10 +867,10 @@ class Output {
             for (let px = 0; px < this.width; px++) {
                 let k = ((py * this.width) + px) * 4;
                 let total_value = 0;
-                this.controller.noises.forEach(noise => {
-                    total_value += noise.values[py][px];
+                this.controller.noise_panels.forEach(panel => {
+                    total_value += panel.values[py][px];
                 })
-                total_value /= this.controller.noises.length;
+                total_value /= this.controller.noise_panels.length;
                 let noise = total_value;
                 imagedata.data[k] = 255 * noise;
                 imagedata.data[k + 1] = 255 * noise;
@@ -871,6 +894,8 @@ class Output {
 function on_load() {
     console.log("Hello, World!");
     let controller = new Controller();
+    controller.noise_panels.push(new NoisePanel(controller));
+    controller.noise_panels.push(new NoisePanel(controller));
     controller.setup();
     controller.update();
 }
