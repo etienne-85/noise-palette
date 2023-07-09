@@ -106,11 +106,12 @@ function gradient_at(master_seed, j, i) {
 
 class ParameterInput {
 
-    constructor(reference, name, label) {
+    constructor(reference, name, label, default_value) {
         this.reference = reference;
         this.name = name;
         this.label = label;
         this.id = null;
+        this.default_value = default_value;
         this.initial_value = null;
         this.element = null;
     }
@@ -128,9 +129,17 @@ class ParameterInput {
         container.appendChild(wrapper);
         var self = this;
         this.element.addEventListener("input", () => { self.update(); });
+        wrapper.addEventListener("dblclick", () => {
+            self.write(self.default_value);
+            self.update();
+        });
     }
 
     read() {
+        throw new Error("Not implemented!");
+    }
+
+    write(value) {
         throw new Error("Not implemented!");
     }
 
@@ -145,12 +154,11 @@ class ParameterInput {
 
 class RangeParameterInput extends ParameterInput {
 
-    constructor(reference, name, label, min, max, step, default_value) {
-        super(reference, name, label);
+    constructor(reference, name, label, default_value, min, max, step) {
+        super(reference, name, label, default_value);
         this.min = min;
         this.max = max;
         this.step = step;
-        this.default_value = default_value;
     }
 
     inflate(wrapper) {
@@ -173,12 +181,16 @@ class RangeParameterInput extends ParameterInput {
         return is_integer(this.step) ? parseInt(this.element.value) : parseFloat(this.element.value);
     }
 
+    write(value) {
+        this.element.value = value;
+    }
+
 }
 
 class SelectParameterInput extends ParameterInput {
 
-    constructor(reference, name, label, options) {
-        super(reference, name, label)
+    constructor(reference, name, label, default_value, options) {
+        super(reference, name, label, default_value)
         this.options = options;
     }
 
@@ -208,6 +220,13 @@ class SelectParameterInput extends ParameterInput {
             if (options[i].selected) return options[i].value;
         }
     }
+
+    write(value) {
+        this.element.querySelectorAll("option").forEach(option => {
+            option.selected = option.value == value;
+        });
+    }
+
 }
 
 class BooleanParameterInput extends ParameterInput {
@@ -230,6 +249,11 @@ class BooleanParameterInput extends ParameterInput {
     read() {
         return this.element.checked;
     }
+
+    write(value) {
+        this.element.checked = value;
+    }
+
 }
 
 class Controller {
@@ -297,9 +321,9 @@ class PerlinNoise {
         this.context = this.canvas.getContext("2d");
         let panel_inputs = document.createElement("div");
         panel_inputs.classList.add("panel-inputs");
-        this.inputs.push(new RangeParameterInput(this, "seed", "Seed", 1, 1000, 1, 500));
-        this.inputs.push(new RangeParameterInput(this, "scale", "Scale", 8, 512, 1, 64));
-        this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", ["linear", "smooth", "smoother"]));
+        this.inputs.push(new RangeParameterInput(this, "seed", "Seed", 0, 1, 1000, 1));
+        this.inputs.push(new RangeParameterInput(this, "scale", "Scale", 64, 8, 512, 1));
+        this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]));
         this.inputs.push(new BooleanParameterInput(this, "draw_grid", "Draw grid"));
         this.inputs.forEach(input => {
             input.setup(panel_inputs);
