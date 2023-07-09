@@ -103,130 +103,132 @@ function gradient_at(master_seed, j, i) {
     return new Vect2(0, 1).rot(prng * 2 * Math.PI);
 }
 
-class RangeParameterInput {
-    constructor(reference, name, label, min, max, step, default_) {
+
+class ParameterInput {
+
+    constructor(reference, name, label) {
         this.reference = reference;
         this.name = name;
         this.label = label;
-        this.min = min;
-        this.max = max;
-        this.step = step;
-        this.default = default_;
+        this.id = null;
+        this.initial_value = null;
         this.element = null;
     }
 
+    inflate(wrapper) {
+        throw new Error("Not implemented!");
+    }
+
     setup(container) {
+        this.id = `input-${this.reference.get_input_id()}`;
+        this.initial_value = this.reference.config[this.name];
         let wrapper = document.createElement("div");
         wrapper.classList.add("panel-input");
-        wrapper.classList.add("panel-input-range");
-        this.element = document.createElement("input");
-        this.element.id = `input-${this.reference.get_input_id()}`;
-        this.element.type = "range";
-        this.element.min = this.min;
-        this.element.max = this.max;
-        this.element.step = this.step;
-        this.element.value = this.reference.config[this.name];
-        let label = document.createElement("label");
-        label.setAttribute("for", this.element.id);
-        label.textContent = this.label;
-        wrapper.appendChild(label);
-        wrapper.appendChild(this.element);
+        this.inflate(wrapper);
         container.appendChild(wrapper);
         var self = this;
-        this.element.addEventListener("input", () => {self.update()});
+        this.element.addEventListener("input", () => { self.update(); });
+    }
+
+    read() {
+        throw new Error("Not implemented!");
     }
 
     update() {
-        let new_value = 0;
-        if (is_integer(this.step)) {
-            new_value = parseInt(this.element.value);
-        } else {
-            new_value = parseFloat(this.element.value);
-        }
-        this.reference.config[this.name] = new_value;
+        let value = this.read();
+        this.reference.config[this.name] = value;
         this.reference.on_input_update();
     }
 
 }
 
-class SelectParameterInput {
-    constructor(reference, name, label, options) {
-        this.reference = reference;
-        this.name = name;
-        this.label = label;
-        this.options = options;
-        this.element = null;
+
+class RangeParameterInput extends ParameterInput {
+
+    constructor(reference, name, label, min, max, step, default_value) {
+        super(reference, name, label);
+        this.min = min;
+        this.max = max;
+        this.step = step;
+        this.default_value = default_value;
     }
 
-    setup(container) {
-        let wrapper = document.createElement("div");
-        wrapper.classList.add("panel-input");
+    inflate(wrapper) {
+        wrapper.classList.add("panel-input-range");
+        this.element = document.createElement("input");
+        this.element.id = this.id;
+        this.element.type = "range";
+        this.element.min = this.min;
+        this.element.max = this.max;
+        this.element.step = this.step;
+        this.element.value = this.initial_value;
+        let label = document.createElement("label");
+        label.setAttribute("for", this.id);
+        label.textContent = this.label;
+        wrapper.appendChild(label);
+        wrapper.appendChild(this.element);
+    }
+
+    read() {
+        return is_integer(this.step) ? parseInt(this.element.value) : parseFloat(this.element.value);
+    }
+
+}
+
+class SelectParameterInput extends ParameterInput {
+
+    constructor(reference, name, label, options) {
+        super(reference, name, label)
+        this.options = options;
+    }
+
+    inflate(wrapper) {
         wrapper.classList.add("panel-input-select");
         this.element = document.createElement("select");
-        this.element.id = `input-${this.reference.get_input_id()}`;
+        this.element.id = this.id;
         this.options.forEach(option_text => {
             let option = document.createElement("option");
             option.value = option_text;
             option.textContent = option_text;
-            if (option_text == this.reference.config[this.name]) {
+            if (option_text == this.initial_value) {
                 option.selected = true;
             }
             this.element.appendChild(option);
         });
         let label = document.createElement("label");
-        label.setAttribute("for", this.element.id);
+        label.setAttribute("for", this.id);
         label.textContent = this.label;
         wrapper.appendChild(label);
         wrapper.appendChild(this.element);
-        container.appendChild(wrapper);
-        var self = this;
-        this.element.addEventListener("input", () => {self.update()});
     }
 
-    update() {
-        let new_value = "";
-        this.element.querySelectorAll("option").forEach(option => {
-            if (option.selected) {
-                new_value = option.value;
-            }
-        });
-        this.reference.config[this.name] = new_value;
-        this.reference.on_input_update();
+    read() {
+        let options = this.element.querySelectorAll("option");
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].selected) return options[i].value;
+        }
     }
 }
 
-class BooleanParameterInput {
-    constructor(reference, name, label) {
-        this.reference = reference;
-        this.name = name;
-        this.label = label;
-        this.element = null;
-    }
+class BooleanParameterInput extends ParameterInput {
 
-    setup(container) {
-        let wrapper = document.createElement("div");
-        wrapper.classList.add("panel-input");
+    inflate(wrapper) {
         wrapper.classList.add("panel-input-boolean");
         this.element = document.createElement("input");
-        this.element.id = `input-${this.reference.get_input_id()}`;
+        this.element.id = this.id;
         this.element.type = "checkbox";
-        if (this.reference.config[this.name]) {
+        if (this.initial_value) {
             this.element.checked = true;
         }
         let label = document.createElement("label");
-        label.setAttribute("for", this.element.id);
+        label.setAttribute("for", this.id);
         label.textContent = this.label;
         wrapper.appendChild(this.element);
         wrapper.appendChild(label);
-        container.appendChild(wrapper);
-        var self = this;
-        this.element.addEventListener("input", () => {self.update()});
     }
 
-    update() {
-        let new_value = this.element.checked;
-        this.reference.config[this.name] = new_value;
-        this.reference.on_input_update();
+    read() {
+        return this.element.checked;
     }
 }
 
@@ -274,7 +276,7 @@ class PerlinNoise {
         this.width = this.controller.config.width;
         this.height = this.controller.config.height;
         this.config = {
-            seed: Math.floor(Math.random() * (2 ** 30)),
+            seed: -Math.floor(Math.random() * (2 ** 30)),
             scale: 64,
             interpolation: "smoother",
             draw_grid: false,
