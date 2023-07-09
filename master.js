@@ -328,6 +328,7 @@ class Controller {
             width: 400,
             height: 400
         };
+        this.output = new Output(this, {});
         for (let key in config) {
             this.config[key] = config[key];
         }
@@ -336,13 +337,17 @@ class Controller {
 
     setup() {
         let panels_container = document.getElementById("panels");
-        let default_noise = new PerlinNoise(this, {});
-        default_noise.setup(panels_container);
-        this.noises.push(default_noise);
+        this.noises.push(new PerlinNoise(this, {}));
+        this.noises.push(new PerlinNoise(this, {}));
+        this.noises.forEach(noise => {
+            noise.setup(panels_container);
+        });
+        this.output.setup(panels_container);
     }
 
     update() {
         this.noises.forEach(noise => { noise.update(); });
+        this.output.update();
     }
 
     get_input_id() {
@@ -354,7 +359,6 @@ class Controller {
 
 
 function cubic_bezier(P0, P1, P2, P3, x, tol=0.0001) {
-    let z = 0;
     let maxt = 1;
     let mint = 0;
     let t = 0.5;
@@ -641,9 +645,10 @@ class PerlinNoise {
         }
     }
 
-    create_dom_element(container) {
+    setup(container) {
         let panel = document.createElement("div");
         panel.classList.add("panel");
+        panel.classList.add("panel-noise");
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("panel-canvas");
         this.canvas.width = this.width;
@@ -662,10 +667,6 @@ class PerlinNoise {
         });
         panel.appendChild(panel_inputs);
         container.appendChild(panel);
-    }
-
-    setup(container) {
-        this.create_dom_element(container);
     }
 
     update_gradients() {
@@ -762,6 +763,71 @@ class PerlinNoise {
         if (this.config.draw_grid) {
             this.draw_grid();
         }
+    }
+
+    get_input_id() {
+        return this.controller.get_input_id();
+    }
+
+    on_input_update() {
+        this.controller.update();
+    }
+
+}
+
+class Output {
+
+    constructor(controller, config) {
+        this.controller = controller;
+        this.canvas = null;
+        this.context = null;
+        this.inputs = [];
+        this.values = null;
+        this.width = this.controller.config.width;
+        this.height = this.controller.config.height;
+        this.config = {}
+        for (let key in config) {
+            this.config[key] = config[key];
+        }
+    }
+
+    setup(container) {
+        let panel = document.createElement("div");
+        panel.classList.add("panel");
+        panel.classList.add("panel-ouput");
+        this.canvas = document.createElement("canvas");
+        this.canvas.classList.add("panel-canvas");
+        this.canvas.width = this.width;
+        this.canvas.height = this.height;
+        panel.appendChild(this.canvas);
+        this.context = this.canvas.getContext("2d");
+        let panel_inputs = document.createElement("div");
+        panel_inputs.classList.add("panel-inputs");
+        this.inputs.forEach(input => {
+            input.setup(panel_inputs);
+        });
+        panel.appendChild(panel_inputs);
+        container.appendChild(panel);
+    }
+
+    update() {
+        let imagedata = new ImageData(this.width, this.height);
+        for (let py = 0; py < this.height; py++) {
+            for (let px = 0; px < this.width; px++) {
+                let k = ((py * this.width) + px) * 4;
+                let total_value = 0;
+                this.controller.noises.forEach(noise => {
+                    total_value += noise.values[py][px];
+                })
+                total_value /= this.controller.noises.length;
+                let noise = total_value;
+                imagedata.data[k] = 255 * noise;
+                imagedata.data[k + 1] = 255 * noise;
+                imagedata.data[k + 2] = 255 * noise;
+                imagedata.data[k + 3] = 255;
+            }
+        }
+        this.context.putImageData(imagedata, 0, 0);
     }
 
     get_input_id() {
