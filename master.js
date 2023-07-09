@@ -75,30 +75,30 @@ function interp_smoother(t, x0, x1) {
     return (x1 - x0) * ((t * (t * 6.0 - 15.0) + 10.0) * t * t * t) + x0;
 }
 
-function spiral_index(x, y) {
+function spiral_index(j, i) {
     /** @see https://superzhu.gitbooks.io/bigdata/content/algo/get_spiral_index_from_location.html */
     let index = 0;
-    if (x * x >= y * y) {
-        index = 4 * x * x  - x - y;
-        if (x < y) {
-            index -= 2 * (x - y);
+    if (j * j >= i * i) {
+        index = 4 * j * j  - j - i;
+        if (j < i) {
+            index -= 2 * (j - i);
         }
     } else {
-        index = 4 * y * y - x - y;
-        if (x < y) {
-            index += 2 * (x - y);
+        index = 4 * i * i - j - i;
+        if (j < i) {
+            index += 2 * (j - i);
         }
     }
     return index;
 }
 
-function seed_at(master_seed, x, y) {
-    return master_seed + spiral_index(x, y);
+function seed_at(master_seed, j, i) {
+    return master_seed + spiral_index(j, i);
 }
 
-function gradient_at(master_seed, x, y) {
+function gradient_at(master_seed, j, i) {
     /** @see https://github.com/davidbau/seedrandom */
-    let local_seed = seed_at(master_seed, x, y);
+    let local_seed = seed_at(master_seed, j, i);
     let prng = (new Math.seedrandom(local_seed))();
     return new Vect2(0, 1).rot(prng * 2 * Math.PI);
 }
@@ -312,12 +312,14 @@ class PerlinNoise {
 
     update_gradients() {
         this.gradients = [];
-        let grid_width = Math.floor(this.width / this.config.scale) + 2;
-        let grid_height = Math.floor(this.height / this.config.scale) + 2;
-        for (let y = 0; y < grid_height; y++) {
+        let jstart = Math.floor(-this.width / 2 / this.config.scale) - 1;
+        let jend = Math.floor(this.width / 2 / this.config.scale) + 1;
+        let istart = Math.floor(-this.height / 2 / this.config.scale) - 1;
+        let iend = Math.floor(this.height / 2 / this.config.scale) + 1;
+        for (let i = istart; i <= iend; i++) {
             this.gradients.push([]);
-            for (let x = 0; x < grid_width; x++) {
-                this.gradients[y].push(gradient_at(this.config.seed, x, y));
+            for (let j = jstart; j <= jend; j++) {
+                this.gradients[i - istart].push(gradient_at(this.config.seed, j, i));
             }
         }
     }
@@ -332,23 +334,25 @@ class PerlinNoise {
             interp = interp_smoother;
         }
         this.values = [];
+        let jstart = Math.floor(-this.width / 2 / this.config.scale) - 1;
+        let istart = Math.floor(-this.height / 2 / this.config.scale) - 1;
         for (let py = 0; py < this.height; py++) {
             this.values.push([]);
             for (let px = 0; px < this.width; px++) {
-                let x = px / this.config.scale;
-                let y = py / this.config.scale;
-                let x0 = Math.floor(x);
-                let y0 = Math.floor(y);
-                let x1 = x0 + 1;
-                let y1 = y0 + 1;
-                let dot_ul = this.gradients[y0][x0].dot(new Vect2(x - x0, y - y0));
-                let dot_bl = this.gradients[y1][x0].dot(new Vect2(x - x0, y - y1));
-                let il = interp(y - y0, dot_ul, dot_bl);
-                let dot_ur = this.gradients[y0][x1].dot(new Vect2(x - x1, y - y0));
-                let dot_br = this.gradients[y1][x1].dot(new Vect2(x - x1, y - y1));
-                let ir = interp(y - y0, dot_ur, dot_br);
-                let i = (interp(x - x0, il, ir) * 0.5) + 0.5;
-                this.values[py].push(i);
+                let j = (px - this.width / 2) / this.config.scale - jstart;
+                let i = (py - this.height / 2) / this.config.scale - istart;
+                let j0 = Math.floor(j);
+                let i0 = Math.floor(i);
+                let j1 = j0 + 1;
+                let i1 = i0 + 1;
+                let dot_ul = this.gradients[i0][j0].dot(new Vect2(j - j0, i - i0));
+                let dot_bl = this.gradients[i1][j0].dot(new Vect2(j - j0, i - i1));
+                let interp_left = interp(i - i0, dot_ul, dot_bl);
+                let dot_ur = this.gradients[i0][j1].dot(new Vect2(j - j1, i - i0));
+                let dot_br = this.gradients[i1][j1].dot(new Vect2(j - j1, i - i1));
+                let interp_right = interp(i - i0, dot_ur, dot_br);
+                let interp_vert = (interp(j - j0, interp_left, interp_right) * 0.5) + 0.5;
+                this.values[py].push(interp_vert);
             }
         }
     }
@@ -357,17 +361,20 @@ class PerlinNoise {
         this.context.fillStyle = "blue";
         this.context.strokeStyle = "red";
         this.context.lineWidth = 1;
-        let grid_width = Math.floor(this.width / this.config.scale) + 2;
-        let grid_height = Math.floor(this.height / this.config.scale) + 2;
-        for (let i = 0; i < grid_height; i++) {
-            for (let j = 0; j < grid_width; j++) {
-                let x = j * this.config.scale;
-                let y = i * this.config.scale;
+        this.context.textAlign = "center";
+        let jstart = Math.floor(-this.width / 2 / this.config.scale) - 1;
+        let jend = Math.floor(this.width / 2 / this.config.scale) + 1;
+        let istart = Math.floor(-this.height / 2 / this.config.scale) - 1;
+        let iend = Math.floor(this.height / 2 / this.config.scale) + 1;
+        for (let i = istart; i <= iend; i++) {
+            for (let j = jstart; j <= jend; j++) {
+                let x = j * this.config.scale + this.width / 2;
+                let y = i * this.config.scale + this.height / 2;
                 this.context.beginPath();
                 this.context.arc(x, y, this.config.scale * 0.05, 0, 2 * Math.PI);
                 this.context.fill();
                 let origin = new Vect2(x, y);
-                let gradient = new Vect2(this.gradients[i][j].x * this.config.scale * 0.5, this.gradients[i][j].y * this.config.scale * 0.5);
+                let gradient = this.gradients[i - istart][j - jstart].copy().mult(this.config.scale * 0.5);
                 draw_arrow(this.context, origin, gradient);
             }
         }
