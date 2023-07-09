@@ -508,7 +508,7 @@ class SplineParameterInput extends ParameterInput {
                 return false;
             }
         });
-        this.element.addEventListener("mousedown", (event) => {
+        window.addEventListener("mousedown", (event) => {
             let target = self.get_click_target(event);
             if (target.control != null && !event.shiftKey) {
                 self.moving_control = target.control;
@@ -523,20 +523,21 @@ class SplineParameterInput extends ParameterInput {
                 }
             }
         });
-        this.element.addEventListener("mousemove", (event) => {
+        wrapper.addEventListener("mousemove", (event) => {
             if (self.moving_control != null) {
                 let target = self.get_click_target(event, false);
-                let dx = target.x - self.controls[self.moving_control][0];
-                if (self.moving_control <= 1) {
-                    dx = 0;
+                let prevx = self.controls[self.moving_control][0];
+                let prevy = self.controls[self.moving_control][1];
+                if (self.moving_control > 1) {
+                    self.controls[self.moving_control][0] = Math.min(1, Math.max(0, target.x));
                 }
-                let dy = target.y - self.controls[self.moving_control][1];
-                self.controls[self.moving_control][0] = Math.min(1, Math.max(0, self.controls[self.moving_control][0] + dx));
-                self.controls[self.moving_control][1] = Math.min(1, Math.max(0, self.controls[self.moving_control][1] + dy));
-                self.controls[self.moving_control][2] = Math.min(1, Math.max(0, self.controls[self.moving_control][2] + dx));
-                self.controls[self.moving_control][3] = Math.min(1, Math.max(0, self.controls[self.moving_control][3] + dy));
-                self.controls[self.moving_control][4] = Math.min(1, Math.max(0, self.controls[self.moving_control][4] + dx));
-                self.controls[self.moving_control][5] = Math.min(1, Math.max(0, self.controls[self.moving_control][5] + dy));
+                self.controls[self.moving_control][1] = Math.min(1, Math.max(0, target.y));
+                let dx = self.controls[self.moving_control][0] - prevx;
+                let dy = self.controls[self.moving_control][1] - prevy;
+                self.controls[self.moving_control][2] += dx;
+                self.controls[self.moving_control][3] += dy;
+                self.controls[self.moving_control][4] += dx;
+                self.controls[self.moving_control][5] += dy;
                 self.update();
             } else if (self.moving_bezier_control != null) {
                 let target = self.get_click_target(event, false);
@@ -558,9 +559,9 @@ class SplineParameterInput extends ParameterInput {
     }
 
     on_ctrl_click(target) {
-        if (target.control != null) {
+        if (target.control != null && target.control > 1) {
             this.controls.splice(target.control, 1);
-        } else {
+        } else if (target.control == null) {
             this.controls.push([target.x, target.y, target.x, target.y, target.x, target.y]);
         }
     }
