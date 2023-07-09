@@ -569,6 +569,33 @@ class SplineParameterInput extends ParameterInput {
     draw() {
         let spline = new Spline(this.controls);
         this.context.clearRect(0, 0, this.width, this.height);
+
+        this.context.strokeStyle = "grey";
+        this.context.lineWidth = 0.75;
+        this.context.beginPath();
+        this.context.moveTo(this.padding, this.padding);
+        this.context.lineTo(this.width - this.padding, this.padding);
+        this.context.lineTo(this.width - this.padding, this.height - this.padding);
+        this.context.lineTo(this.padding, this.height - this.padding);
+        this.context.lineTo(this.padding, this.padding);
+        this.context.moveTo(this.width / 2, this.padding);
+        this.context.lineTo(this.width / 2, this.height - this.padding);
+        this.context.moveTo(this.padding, this.height / 2);
+        this.context.lineTo(this.width - this.padding, this.height / 2);
+        this.context.stroke();
+        this.context.lineWidth = 0.3;
+        this.context.beginPath();
+        this.context.moveTo(this.width / 4, this.padding);
+        this.context.lineTo(this.width / 4, this.height - this.padding);
+        this.context.moveTo(3 * this.width / 4, this.padding);
+        this.context.lineTo(3 * this.width / 4, this.height - this.padding);
+        this.context.moveTo(this.padding, this.height / 4);
+        this.context.lineTo(this.width - this.padding, this.height / 4);
+        this.context.moveTo(this.padding, 3 * this.height / 4);
+        this.context.lineTo(this.width - this.padding, 3 * this.height / 4);
+        this.context.stroke();
+
+        this.context.lineWidth = 1;
         this.context.strokeStyle = "black";
         this.context.beginPath();
         let inner_width = this.width - 2 * this.padding;
