@@ -325,8 +325,8 @@ class Controller {
     constructor(config) {
         this.noises = [];
         this.config = {
-            width: 512,
-            height: 512
+            width: 400,
+            height: 400
         };
         for (let key in config) {
             this.config[key] = config[key];
@@ -352,6 +352,272 @@ class Controller {
 
 }
 
+
+function cubic_bezier(P0, P1, P2, P3, x, tol=0.0001) {
+    let z = 0;
+    let maxt = 1;
+    let mint = 0;
+    let t = 0.5;
+    while (true) {
+        t = (maxt + mint) / 2;
+        let z = P0[0] * (1 - t) ** 3 + 3 * P1[0] * t * (1 - t) ** 2 + 3 * P2[0] * (1 - t) * t ** 2 + P3[0] * t ** 3;
+        if (Math.abs(z - x) < tol) break;
+        if (z < x) {
+            mint = t;
+        } else {
+            maxt = t;
+        }
+    }
+    return P0[1] * (1 - t) ** 3 + 3 * P1[1] * t * (1 - t) ** 2 + 3 * P2[1] * (1 - t) * t ** 2 + P3[1] * t ** 3;
+}
+
+
+class Spline {
+    constructor(controls) {
+        this.controls = [...controls];
+        this.controls.sort((a, b) => { return a[0] - b[0] });
+    }
+
+    eval(t) {
+        let x = Math.min(1, Math.max(0, t));
+        let i0 = 0;
+        for (let i = 0; i < this.controls.length; i++) {
+            if (this.controls[i][0] == x) return this.controls[i][1];
+            if (i < this.controls.length - 1 && this.controls[i][0] < x && this.controls[i + 1][0] > x) {
+                i0 = i;
+                break;
+            }
+        }
+        let i1 = i0 + 1;
+        let y = cubic_bezier(
+            [this.controls[i0][0], this.controls[i0][1]],
+            [this.controls[i0][4], this.controls[i0][5]],
+            [this.controls[i1][2], this.controls[i1][3]],
+            [this.controls[i1][0], this.controls[i1][1]],
+            x,
+        )
+        return y;
+    }
+}
+
+class SplineParameterInput extends ParameterInput {
+
+    constructor(reference, name, label) {
+        super(reference, name, label, [[0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1]]);
+        this.controls = [[0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1]];
+        this.padding = 8;
+        this.width = 256;
+        this.height = 256;
+        this.dot_size = 10;
+        this.context = null;
+        this.moving_control = null;
+        this.moving_bezier_control = null;
+    }
+
+    get_click_target(event, collisions=true) {
+        let bounds = event.target.getBoundingClientRect();
+        let x = (event.clientX - bounds.left - this.padding) / (this.width - 2 * this.padding);
+        let y = 1 - (event.clientY - bounds.top - this.padding) / (this.width - 2 * this.padding);
+        let hitbox = this.dot_size / (this.width - 2 * this.padding) / 1.5;
+        let control = null;
+        let bezier_control = null;
+        if (collisions) {
+            for (let i = 0; i < this.controls.length; i++) {
+                if (Math.abs(this.controls[i][0] - x) < hitbox && Math.abs(this.controls[i][1] - y) < hitbox) {
+                    control = i;
+                }
+                if (Math.abs(this.controls[i][2] - x) < hitbox && Math.abs(this.controls[i][3] - y) < hitbox) {
+                    bezier_control = { control: i, index: 0 };
+                }
+                if (Math.abs(this.controls[i][4] - x) < hitbox && Math.abs(this.controls[i][5] - y) < hitbox) {
+                    bezier_control = { control: i, index: 1 };
+                }
+            }
+        }
+        return {
+            x: x,
+            y: y,
+            control: control,
+            bezier_control: bezier_control,
+        }
+    }
+
+    get_closest_control(target) {
+        let controls = [];
+        for (let i = 0; i < this.controls.length; i++) {
+            controls.push({
+                index: i,
+                distance: Math.abs(this.controls[i][0] - target.x) + Math.abs(this.controls[i][1] - target.y)
+            });
+        }
+        controls.sort((a, b) => { return a.distance - b.distance });
+        return controls[0].index;
+    }
+
+    get_closest_bezier_control(target) {
+        let bezier_controls = [];
+        for (let i = 0; i < this.controls.length; i++) {
+            bezier_controls.push({
+                control: i,
+                index: 0,
+                distance: Math.abs(this.controls[i][2] - target.x) + Math.abs(this.controls[i][3] - target.y)
+            });
+            bezier_controls.push({
+                control: i,
+                index: 1,
+                distance: Math.abs(this.controls[i][4] - target.x) + Math.abs(this.controls[i][5] - target.y)
+            });
+        }
+        bezier_controls.sort((a, b) => { return a.distance - b.distance });
+        return bezier_controls[0];
+    }
+
+    inflate(wrapper) {
+        this.controls = [...this.initial_value];
+        this.element = document.createElement("canvas");
+        this.element.width = this.width;
+        this.element.height = this.height;
+        this.context = this.element.getContext("2d");
+        wrapper.appendChild(this.element);
+        this.draw();
+        var self = this;
+        this.element.addEventListener("click", (event) => {
+            let target = self.get_click_target(event);
+            if (event.ctrlKey) {
+                self.on_ctrl_click(target);
+            }
+            self.update();
+        });
+        this.element.addEventListener("dblclick", (event) => {
+            let target = self.get_click_target(event);
+            if (target.bezier_control != null) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (target.bezier_control.index == 0) {
+                    self.controls[target.bezier_control.control][2] = self.controls[target.bezier_control.control][0];
+                    self.controls[target.bezier_control.control][3] = self.controls[target.bezier_control.control][1];
+                } else {
+                    self.controls[target.bezier_control.control][4] = self.controls[target.bezier_control.control][0];
+                    self.controls[target.bezier_control.control][5] = self.controls[target.bezier_control.control][1];
+                }
+                self.update();
+                return false;
+            }
+        });
+        this.element.addEventListener("mousedown", (event) => {
+            let target = self.get_click_target(event);
+            if (target.control != null && !event.shiftKey) {
+                self.moving_control = target.control;
+            } else if (target.bezier_control != null) {
+                self.moving_bezier_control = target.bezier_control;
+            } else if (event.shiftKey) {
+                let closest_control = self.get_closest_control(target);
+                if (self.controls[closest_control][0] > target.x) {
+                    self.moving_bezier_control = { control: closest_control, index: 0 };
+                } else {
+                    self.moving_bezier_control = { control: closest_control, index: 1 };
+                }
+            }
+        });
+        this.element.addEventListener("mousemove", (event) => {
+            if (self.moving_control != null) {
+                let target = self.get_click_target(event, false);
+                let dx = target.x - self.controls[self.moving_control][0];
+                if (self.moving_control <= 1) {
+                    dx = 0;
+                }
+                let dy = target.y - self.controls[self.moving_control][1];
+                self.controls[self.moving_control][0] = Math.min(1, Math.max(0, self.controls[self.moving_control][0] + dx));
+                self.controls[self.moving_control][1] = Math.min(1, Math.max(0, self.controls[self.moving_control][1] + dy));
+                self.controls[self.moving_control][2] = Math.min(1, Math.max(0, self.controls[self.moving_control][2] + dx));
+                self.controls[self.moving_control][3] = Math.min(1, Math.max(0, self.controls[self.moving_control][3] + dy));
+                self.controls[self.moving_control][4] = Math.min(1, Math.max(0, self.controls[self.moving_control][4] + dx));
+                self.controls[self.moving_control][5] = Math.min(1, Math.max(0, self.controls[self.moving_control][5] + dy));
+                self.update();
+            } else if (self.moving_bezier_control != null) {
+                let target = self.get_click_target(event, false);
+                if (self.moving_bezier_control.index == 0) {
+                    self.controls[self.moving_bezier_control.control][2] = target.x;
+                    self.controls[self.moving_bezier_control.control][3] = target.y;
+                } else {
+                    self.controls[self.moving_bezier_control.control][4] = target.x;
+                    self.controls[self.moving_bezier_control.control][5] = target.y;
+                }
+                self.update();
+            }
+        });
+        window.addEventListener("mouseup", (event) => {
+            self.moving_control = null;
+            self.moving_bezier_control = null;
+            //TODO: also make the final move
+        });
+    }
+
+    on_ctrl_click(target) {
+        if (target.control != null) {
+            this.controls.splice(target.control, 1);
+        } else {
+            this.controls.push([target.x, target.y, target.x, target.y, target.x, target.y]);
+        }
+    }
+
+    draw() {
+        let spline = new Spline(this.controls);
+        this.context.clearRect(0, 0, this.width, this.height);
+        this.context.strokeStyle = "black";
+        this.context.beginPath();
+        let inner_width = this.width - 2 * this.padding;
+        let inner_height = this.height - 2 * this.padding;
+        let ystart = spline.eval(0) * inner_height;
+        this.context.moveTo(this.padding, this.height - ystart - this.padding);
+        for (let i = 1; i < inner_width; i++) {
+            let y = spline.eval(i / (inner_width - 1)) * inner_height + this.padding;
+            this.context.lineTo(i + this.padding, this.height - y);
+        }
+        this.context.stroke();
+        this.controls.forEach(control => {
+            let x0 = control[0] * inner_width + this.padding - this.dot_size / 2;
+            let y0 = this.height - (control[1] * inner_height + this.padding + this.dot_size / 2);
+            let x1 = control[2] * inner_width + this.padding - this.dot_size / 2;
+            let y1 = this.height - (control[3] * inner_height + this.padding + this.dot_size / 2);
+            let x2 = control[4] * inner_width + this.padding - this.dot_size / 2;
+            let y2 = this.height - (control[5] * inner_height + this.padding + this.dot_size / 2);
+            this.context.fillStyle = "red";
+            this.context.strokeStyle = "red";
+            this.context.beginPath();
+            this.context.arc(x1 + this.dot_size / 2, y1 + this.dot_size / 2, .45 * this.dot_size, 0, 2 * Math.PI);
+            this.context.fill();
+            this.context.beginPath();
+            this.context.moveTo(x0 + this.dot_size / 2, y0 + this.dot_size / 2);
+            this.context.lineTo(x1 + this.dot_size / 2, y1 + this.dot_size / 2);
+            this.context.stroke();
+            this.context.beginPath();
+            this.context.arc(x2 + this.dot_size / 2, y2 + this.dot_size / 2, .45 * this.dot_size, 0, 2 * Math.PI);
+            this.context.fill();
+            this.context.beginPath();
+            this.context.moveTo(x0 + this.dot_size / 2, y0 + this.dot_size / 2);
+            this.context.lineTo(x2 + this.dot_size / 2, y2 + this.dot_size / 2);
+            this.context.stroke();
+            this.context.fillStyle = "black";
+            this.context.fillRect(x0, y0, this.dot_size, this.dot_size);
+        });
+    }
+
+    read() {
+        return this.controls;
+    }
+
+    write(value) {
+        this.controls = [...value];
+    }
+
+    update() {
+        super.update();
+        this.draw();
+    }
+
+}
+
 class PerlinNoise {
 
     constructor(controller, config) {
@@ -368,6 +634,7 @@ class PerlinNoise {
             scale: 64,
             interpolation: "smoother",
             draw_grid: false,
+            spline: [[0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1]],
         }
         for (let key in config) {
             this.config[key] = config[key];
@@ -389,6 +656,7 @@ class PerlinNoise {
         this.inputs.push(new RangeParameterInput(this, "scale", "Scale", 64, 8, 512, 1));
         this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", ["linear", "smooth", "smoother"]));
         this.inputs.push(new BooleanParameterInput(this, "draw_grid", "Draw grid"));
+        this.inputs.push(new SplineParameterInput(this, "spline", "Spline"));
         this.inputs.forEach(input => {
             input.setup(panel_inputs);
         });
@@ -426,6 +694,7 @@ class PerlinNoise {
         this.values = [];
         let jstart = Math.floor(-this.width / 2 / this.config.scale) - 1;
         let istart = Math.floor(-this.height / 2 / this.config.scale) - 1;
+        let spline = new Spline(this.config.spline);
         for (let py = 0; py < this.height; py++) {
             this.values.push([]);
             for (let px = 0; px < this.width; px++) {
@@ -442,7 +711,8 @@ class PerlinNoise {
                 let dot_br = this.gradients[i1][j1].dot(new Vect2(j - j1, i - i1));
                 let interp_right = interp(i - i0, dot_ur, dot_br);
                 let interp_vert = (interp(j - j0, interp_left, interp_right) * 0.5) + 0.5;
-                this.values[py].push(interp_vert);
+                let interp_splined = spline.eval(interp_vert);
+                this.values[py].push(interp_splined);
             }
         }
     }
