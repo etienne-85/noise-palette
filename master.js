@@ -128,11 +128,8 @@ class ParameterInput {
         this.inflate(wrapper);
         container.appendChild(wrapper);
         var self = this;
-        this.element.addEventListener("input", () => { self.update(); });
-        wrapper.addEventListener("dblclick", () => {
-            self.write(self.default_value);
-            self.update();
-        });
+        this.element.addEventListener("input", () => { self.oninput(); });
+        wrapper.addEventListener("dblclick", () => { self.ondblclick(); });
     }
 
     read() {
@@ -149,16 +146,27 @@ class ParameterInput {
         this.reference.on_input_update();
     }
 
+    oninput() {
+        this.update(); 
+    }
+
+    ondblclick() {
+        this.write(this.default_value);
+        this.update();
+    }
+
 }
 
 
 class RangeParameterInput extends ParameterInput {
 
-    constructor(reference, name, label, default_value, min, max, step) {
+    constructor(reference, name, label, default_value, min, max, step, transform) {
         super(reference, name, label, default_value);
         this.min = min;
         this.max = max;
         this.step = step;
+        this.transform = transform;
+        this.value_span = null;
     }
 
     inflate(wrapper) {
@@ -175,22 +183,33 @@ class RangeParameterInput extends ParameterInput {
         label.textContent = this.label;
         wrapper.appendChild(label);
         wrapper.appendChild(this.element);
+        this.value_span = document.createElement("span");
+        this.value_span.textContent = this.initial_value;
+        wrapper.appendChild(this.value_span);
     }
 
     read() {
-        return is_integer(this.step) ? parseInt(this.element.value) : parseFloat(this.element.value);
+        let base = is_integer(this.step) ? parseInt(this.element.value) : parseFloat(this.element.value);
+        if (this.transform != undefined) return this.transform(base);
+        return base;
+    }
+
+    oninput() {
+        super.oninput();
+        this.value_span.textContent = this.read();
     }
 
     write(value) {
         this.element.value = value;
+        this.value_span.textContent = value;
     }
 
 }
 
 class SelectParameterInput extends ParameterInput {
 
-    constructor(reference, name, label, default_value, options) {
-        super(reference, name, label, default_value)
+    constructor(reference, name, label, options) {
+        super(reference, name, label, null)
         this.options = options;
     }
 
@@ -227,6 +246,8 @@ class SelectParameterInput extends ParameterInput {
         });
     }
 
+    ondblclick() {}
+
 }
 
 class BooleanParameterInput extends ParameterInput {
@@ -254,7 +275,50 @@ class BooleanParameterInput extends ParameterInput {
         this.element.checked = value;
     }
 
+    ondblclick() {}
+
 }
+
+function random_seed() {
+    return Math.floor(Math.random() * (2 ** 30));
+}
+
+class SeedParameterInput extends ParameterInput {
+
+    inflate(wrapper) {
+        wrapper.classList.add("panel-input-seed");
+        this.element = document.createElement("input");
+        this.element.id = this.id;
+        this.element.type = "number";
+        this.element.step = 1;
+        this.element.value = this.initial_value;
+        let label = document.createElement("label");
+        label.setAttribute("for", this.id);
+        label.textContent = this.label;
+        let button = document.createElement("button");
+        button.textContent = "Random";
+        var self = this;
+        button.addEventListener("click", () => {
+            self.write(random_seed());
+            self.update();
+        });
+        wrapper.appendChild(label);
+        wrapper.appendChild(this.element);
+        wrapper.appendChild(button);
+    }
+
+    read() {
+        return parseInt(this.element.value);
+    }
+
+    write(value) {
+        this.element.value = value;
+    }
+
+    ondblclick() {}
+
+}
+
 
 class Controller {
     
@@ -300,7 +364,7 @@ class PerlinNoise {
         this.width = this.controller.config.width;
         this.height = this.controller.config.height;
         this.config = {
-            seed: -Math.floor(Math.random() * (2 ** 30)),
+            seed: random_seed(),
             scale: 64,
             interpolation: "smoother",
             draw_grid: false,
@@ -321,9 +385,9 @@ class PerlinNoise {
         this.context = this.canvas.getContext("2d");
         let panel_inputs = document.createElement("div");
         panel_inputs.classList.add("panel-inputs");
-        this.inputs.push(new RangeParameterInput(this, "seed", "Seed", 0, 1, 1000, 1));
+        this.inputs.push(new SeedParameterInput(this, "seed", "Seed"));
         this.inputs.push(new RangeParameterInput(this, "scale", "Scale", 64, 8, 512, 1));
-        this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]));
+        this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", ["linear", "smooth", "smoother"]));
         this.inputs.push(new BooleanParameterInput(this, "draw_grid", "Draw grid"));
         this.inputs.forEach(input => {
             input.setup(panel_inputs);
