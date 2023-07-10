@@ -934,6 +934,9 @@ class NoisePanel {
             harmonics: 0,
             harmonic_spread: 2,
             harmonic_gain: 0.5,
+            negative: false,
+            blend_mode: "normal",
+            blend_weight: 1,
         }
         for (let key in config) {
             this.config[key] = config[key];
@@ -971,6 +974,9 @@ class NoisePanel {
         this.inputs.push(new RangeParameterInput(this, "harmonic_gain", "Harmonic Gain", 1, 0, 2, 0.01));
         this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]));
         this.inputs.push(new SplineParameterInput(this, "spline", "Spline", [new ControlPoint(0, 0), new ControlPoint(1, 1)]));
+        this.inputs.push(new BooleanParameterInput(this, "negative", "Negative", false));
+        this.inputs.push(new SelectParameterInput(this, "blend_mode", "Blend Mode", "normal", ["normal", "brighter", "darker", "product", "difference"]));
+        this.inputs.push(new RangeParameterInput(this, "blend_weight", "Blend Weight", 1, 0, 9, 0.01));
         this.inputs.forEach(input => {
             input.setup(panel_inputs);
         });
@@ -1093,21 +1099,27 @@ class OutputPanel {
         container.appendChild(panel);
     }
 
+    color_at(t) {
+        return [255 * t, 255 * t, 255 * t, 255];
+    }
+
     update() {
         let imagedata = new ImageData(this.width, this.height);
         for (let py = 0; py < this.height; py++) {
             for (let px = 0; px < this.width; px++) {
                 let k = ((py * this.width) + px) * 4;
-                let total_value = 0;
+                let value = 0;
+                let total_weight = 0;
                 this.controller.noise_panels.forEach(panel => {
-                    total_value += panel.values[py][px];
+                    value += panel.values[py][px] * panel.config.blend_weight;
+                    total_weight += panel.config.blend_weight;
                 })
-                total_value /= this.controller.noise_panels.length;
-                let noise = total_value;
-                imagedata.data[k] = 255 * noise;
-                imagedata.data[k + 1] = 255 * noise;
-                imagedata.data[k + 2] = 255 * noise;
-                imagedata.data[k + 3] = 255;
+                value /= total_weight;
+                let color = this.color_at(value);
+                imagedata.data[k] = color[0];
+                imagedata.data[k + 1] = color[1];
+                imagedata.data[k + 2] = color[2];
+                imagedata.data[k + 3] = color[3];
             }
         }
         this.context.putImageData(imagedata, 0, 0);
@@ -1131,6 +1143,7 @@ function on_load() {
     console.log("Hello, World!");
     controller = new Controller();
     controller.setup();
+    controller.add_noise_panel();
     controller.add_noise_panel();
     controller.update();
 }
