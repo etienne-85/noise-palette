@@ -1,0 +1,189 @@
+html, body {
+    padding: 0;
+    margin: 0;
+}
+
+body {
+    --text: black;
+    --background-primary: rgb(226, 226, 226);
+    --background-secondary: white;
+    --border: grey;
+    --border-dim: rgb(173, 173, 173);
+    --button-hover: #d0d0d0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    background-color: var(--background-primary);
+    color: var(--text);
+    font-family: 'Ubuntu Mono', 'Courier New', Courier, monospace;
+    font-size: 11pt;
+    height: 100vh;
+    padding: 1em;
+    box-sizing: border-box;
+}
+
+body.dark {
+    --text: white;
+    --background-primary: #181818;
+    --background-secondary: #1f1f1f;
+    --border: grey;
+    --border-dim: black;
+    --button-hover: #505050;
+}
+
+#header {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 1em;
+}
+
+#header > * {
+    margin: 0 .4rem 0 0;
+}
+
+#header >*:last-child {
+    margin-right: none;
+}
+
+#panels {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.panel {
+    padding: 1em;
+    border: 1px solid var(--border);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    background: var(--background-secondary);
+}
+
+.panel-noise {
+    border-right: none;
+}
+
+.panel-buttons {
+    margin-bottom: .4rem;
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+}
+
+.panel-canvas {
+    border: 1px solid var(--border-dim);
+    image-rendering: crisp-edges;
+}
+
+.panel-noise .panel-canvas {
+    width: 254px;
+    height: 254px;
+}
+
+.panel-inputs {
+    overflow-y: auto;
+}
+
+canvas {
+    display: block;
+}
+
+input,
+button,
+select,
+option {
+    font: inherit;
+}
+
+button {
+    padding: .4rem;
+    background-color: var(--background-primary);
+    border: 1px solid var(--border);
+    color: inherit;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: var(--button-hover);
+}
+
+.panel button, .panel select {
+    border: 1px solid var(--border-dim);
+}
+
+select {
+    background: var(--background-primary);
+    border-radius: 0;
+    border: 1px solid var(--border);
+    color: inherit;
+    padding: .4rem;
+}
+
+.panel-input {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: .4rem;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.input-group > * {
+    margin-right: .4rem;
+}
+
+.input-group > *:last-child {
+    margin-right: none;
+}
+
+.input-group button {
+    margin-top: 0;
+}
+
+.panel-input-range .input-group {
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+}
+
+.panel-input-range input[type="range"],
+.panel-input-seed input[type="number"] {
+    width: 100%;
+}
+
+.panel-input-range input[type="number"] {
+    max-width: 3rem;
+}
+
+.panel .input-group {
+    margin-top: .4rem;
+}
+
+.panel-input-spline {
+    overflow: visible;
+}
+
+.panel-input-spline canvas { 
+    border: 1px solid var(--border-dim);
+}
+
+.panel-buttons > * {
+    margin: 0 .4rem 0 0;
+}
+
+.panel-buttons > *:last-child {
+    margin-right: .4rem;
+}

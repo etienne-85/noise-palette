@@ -175,6 +175,8 @@ class RangeParameterInput extends ParameterInput {
 
     inflate(wrapper) {
         wrapper.classList.add("panel-input-range");
+        let input_group = document.createElement("div");
+        input_group.classList.add("input-group");
         this.input_number = document.createElement("input");
         this.input_number.id = this.id;
         this.input_number.type = "number";
@@ -192,8 +194,9 @@ class RangeParameterInput extends ParameterInput {
         label.setAttribute("for", this.id);
         label.textContent = this.label;
         wrapper.appendChild(label);
-        wrapper.appendChild(this.input_range);
-        wrapper.appendChild(this.input_number);
+        input_group.appendChild(this.input_range);
+        input_group.appendChild(this.input_number);
+        wrapper.appendChild(input_group);
         var self = this;
         this.input_range.addEventListener("input", () => {
             self.input_number.value = self.input_range.value;
@@ -313,6 +316,8 @@ class SeedParameterInput extends ParameterInput {
 
     inflate(wrapper) {
         wrapper.classList.add("panel-input-seed");
+        let input_group = document.createElement("div");
+        input_group.classList.add("input-group");
         this.input = document.createElement("input");
         this.input.id = this.id;
         this.input.type = "number";
@@ -330,8 +335,9 @@ class SeedParameterInput extends ParameterInput {
             self.update();
         });
         wrapper.appendChild(label);
-        wrapper.appendChild(this.input);
-        wrapper.appendChild(button);
+        input_group.appendChild(this.input);
+        input_group.appendChild(button);
+        wrapper.appendChild(input_group);
     }
 
     read() {
@@ -589,7 +595,7 @@ class SplineParameterInput extends ParameterInput {
         this.controls = null;
         this.padding = 8;
         this.width = 256;
-        this.height = 256;
+        this.height = 171;
         this.dot_size = 10;
         this.context = null;
         this.moving_control = null;
@@ -600,7 +606,7 @@ class SplineParameterInput extends ParameterInput {
         let bounds = event.target.getBoundingClientRect();
         let target = new Vect2(
             (event.clientX - bounds.left - this.padding) / (this.width - 2 * this.padding),
-            1 - (event.clientY - bounds.top - this.padding) / (this.width - 2 * this.padding),
+            1 - (event.clientY - bounds.top - this.padding) / (this.height - 2 * this.padding),
         );
         target.control = null;
         target.bezier_control = null;
@@ -634,6 +640,7 @@ class SplineParameterInput extends ParameterInput {
     }
 
     inflate(wrapper) {
+        wrapper.classList.add("panel-input-spline");
         this.controls = obj_arr_cpy(this.initial_value);
         this.canvas = document.createElement("canvas");
         this.canvas.width = this.width;
@@ -743,26 +750,26 @@ class SplineParameterInput extends ParameterInput {
         this.context.strokeStyle = "grey";
         this.context.lineWidth = 0.75;
         this.context.beginPath();
-        this.context.moveTo(this.padding, this.padding);
-        this.context.lineTo(this.width - this.padding, this.padding);
-        this.context.lineTo(this.width - this.padding, this.height - this.padding);
-        this.context.lineTo(this.padding, this.height - this.padding);
-        this.context.lineTo(this.padding, this.padding);
-        this.context.moveTo(this.width / 2, this.padding);
-        this.context.lineTo(this.width / 2, this.height - this.padding);
-        this.context.moveTo(this.padding, this.height / 2);
-        this.context.lineTo(this.width - this.padding, this.height / 2);
+        //this.context.moveTo(this.padding, this.padding);
+        //this.context.lineTo(this.width - this.padding, this.padding);
+        //this.context.lineTo(this.width - this.padding, this.height - this.padding);
+        //this.context.lineTo(this.padding, this.height - this.padding);
+        //this.context.lineTo(this.padding, this.padding);
+        this.context.moveTo(this.width / 2, 0);
+        this.context.lineTo(this.width / 2, this.height);
+        this.context.moveTo(0, this.height / 2);
+        this.context.lineTo(this.width, this.height / 2);
         this.context.stroke();
         this.context.lineWidth = 0.3;
         this.context.beginPath();
-        this.context.moveTo(this.width / 4, this.padding);
-        this.context.lineTo(this.width / 4, this.height - this.padding);
-        this.context.moveTo(3 * this.width / 4, this.padding);
-        this.context.lineTo(3 * this.width / 4, this.height - this.padding);
-        this.context.moveTo(this.padding, this.height / 4);
-        this.context.lineTo(this.width - this.padding, this.height / 4);
-        this.context.moveTo(this.padding, 3 * this.height / 4);
-        this.context.lineTo(this.width - this.padding, 3 * this.height / 4);
+        this.context.moveTo(this.width / 4, 0);
+        this.context.lineTo(this.width / 4, this.height);
+        this.context.moveTo(3 * this.width / 4, 0);
+        this.context.lineTo(3 * this.width / 4, this.height);
+        this.context.moveTo(0, this.height / 4);
+        this.context.lineTo(this.width - 0, this.height / 4);
+        this.context.moveTo(0, 3 * this.height / 4);
+        this.context.lineTo(this.width - 0, 3 * this.height / 4);
         this.context.stroke();
     }
 
