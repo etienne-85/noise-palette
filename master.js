@@ -915,6 +915,28 @@ class HeaderBar {
 
 }
 
+
+function cmp_addition(base, x, w) {
+    return base + w * x;
+}
+
+function cmp_difference(base, x, w) {
+    return base - w * x;
+}
+
+function cmp_product(base, x, w) {
+    return base * x * w;
+}
+
+function cmp_brighter(base, x, w) {
+    return Math.max(base, x * w);
+}
+
+function cmp_darker(base, x, w) {
+    return Math.min(base, x, w);
+}
+
+
 class NoisePanel {
 
     constructor(controller, index, config={}) {
@@ -926,6 +948,7 @@ class NoisePanel {
         this.values = null;
         this.width = this.controller.config.width;
         this.height = this.controller.config.height;
+        this.compositor = null;
         this.config = {
             seed: random_seed(),
             scale: 64,
@@ -935,7 +958,7 @@ class NoisePanel {
             harmonic_spread: 2,
             harmonic_gain: 0.5,
             negative: false,
-            blend_mode: "normal",
+            blend_mode: "addition",
             blend_weight: 1,
         }
         for (let key in config) {
@@ -975,7 +998,7 @@ class NoisePanel {
         this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]));
         this.inputs.push(new SplineParameterInput(this, "spline", "Spline", [new ControlPoint(0, 0), new ControlPoint(1, 1)]));
         this.inputs.push(new BooleanParameterInput(this, "negative", "Negative", false));
-        this.inputs.push(new SelectParameterInput(this, "blend_mode", "Blend Mode", "normal", ["normal", "brighter", "darker", "product", "difference"]));
+        this.inputs.push(new SelectParameterInput(this, "blend_mode", "Blend Mode", "addition", ["addition", "difference", "product", "brighter", "darker"]));
         this.inputs.push(new RangeParameterInput(this, "blend_weight", "Blend Weight", 1, 0, 9, 0.01));
         this.inputs.forEach(input => {
             input.setup(panel_inputs);
@@ -1035,6 +1058,17 @@ class NoisePanel {
     }
 
     update() {
+        if (this.config.blend_mode == "addition") {
+            this.compositor = cmp_addition;
+        } else if (this.config.blend_mode == "difference") {
+            this.compositor = cmp_difference;
+        } else if (this.config.blend_mode == "product") {
+            this.compositor = cmp_product;
+        } else if (this.config.blend_mode == "brighter") {
+            this.compositor = cmp_brighter;
+        } else if (this.config.blend_mode == "darker") {
+            this.compositor = cmp_darker;
+        } 
         this.update_values();
         this.update_canvas();
         if (this.config.draw_grid) {
@@ -1109,13 +1143,11 @@ class OutputPanel {
             for (let px = 0; px < this.width; px++) {
                 let k = ((py * this.width) + px) * 4;
                 let value = 0;
-                let total_weight = 0;
                 this.controller.noise_panels.forEach(panel => {
-                    value += panel.values[py][px] * panel.config.blend_weight;
-                    total_weight += panel.config.blend_weight;
-                })
-                value /= total_weight;
-                let color = this.color_at(value);
+                    let z = panel.values[py][px];
+                    value = panel.compositor(value, z, panel.config.blend_weight);
+                });
+                let color = this.color_at(Math.max(0, Math.min(1, value)));
                 imagedata.data[k] = color[0];
                 imagedata.data[k + 1] = color[1];
                 imagedata.data[k + 2] = color[2];
@@ -1143,7 +1175,6 @@ function on_load() {
     console.log("Hello, World!");
     controller = new Controller();
     controller.setup();
-    controller.add_noise_panel();
     controller.add_noise_panel();
     controller.update();
 }
