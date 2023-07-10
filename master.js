@@ -1147,6 +1147,7 @@ class ColorMapping {
     }
 
     precook() {
+        this.precooked = false;
         this.precooked_values = [];
         let n = (1 / this.tol) + 1;
         for (let i = 0; i < n; i++) {
@@ -1161,6 +1162,8 @@ class ColorMapping {
         if (this.precooked) {
             return this.precooked_values[Math.floor(x / this.tol)];
         }
+        if (this.stops[0].t > x) return this.stops[0].color;
+        if (this.stops[this.stops.length - 1].t < x) return this.stops[this.stops.length - 1].color;
         for (let i = 0; i < this.stops.length; i++) {
             if (this.stops[i].t == x) return this.stops[i].color;
             if (i < this.stops.length - 1 && this.stops[i].t < x && this.stops[i + 1].t > x) {
@@ -1190,6 +1193,8 @@ class ColorMappingParameterInput extends ParameterInput {
         this.height = 32;
         this.stops_container_up = null;
         this.stops_container_down = null;
+        this.grabbing = null;
+        this.grabstart = null;
     }
 
     inflate(wrapper) {
@@ -1207,6 +1212,17 @@ class ColorMappingParameterInput extends ParameterInput {
         wrapper.appendChild(this.canvas);
         wrapper.appendChild(this.stops_container_down);
         this.draw();
+        var self = this;
+        window.addEventListener("mousemove", (event) => {
+            if (self.grabbing != null) {
+                self.grabbing.t += (event.clientX - self.grabstart) / self.width;
+                self.grabstart = event.clientX;
+                self.update();
+            }
+        });
+        window.addEventListener("mouseup", (event) => {
+            self.grabbing = null;
+        });
     }
 
     draw() {
@@ -1215,7 +1231,14 @@ class ColorMappingParameterInput extends ParameterInput {
         let imagedata = new ImageData(this.width, this.height);
         for (let j = 0; j < this.width; j++) {
             let t = j / (this.width - 1);
-            let color = mapping.eval(t);
+            let color = [...mapping.eval(t)];
+            if (j == Math.floor(this.width / 4)
+                || j == Math.floor(this.width / 2)
+                || j == Math.floor(3 * this.width / 4)) {
+                    color[0] = 255 - color[0];
+                    color[1] = 255 - color[1];
+                    color[2] = 255 - color[2];
+            }
             for (let i = 0; i < this.height; i++) {
                 let k = ((i * this.width) + j) * 4;
                 imagedata.data[k] = color[0];
@@ -1232,6 +1255,10 @@ class ColorMappingParameterInput extends ParameterInput {
             let cursor = document.createElement("div");
             cursor.classList.add("colorstop-cursor");
             cursor.style.left = `${ (stop.t * 100).toFixed(3) }%`;
+            cursor.addEventListener("mousedown", (event) => {
+                self.grabbing = stop;
+                self.grabstart = event.clientX;
+            });
             this.stops_container_up.appendChild(cursor);
             let input = document.createElement("input");
             input.classList.add("colorstop-input");
@@ -1244,7 +1271,6 @@ class ColorMappingParameterInput extends ParameterInput {
                 self.update();
             });
         });
-        //TODO: move cursors
         //TODO: add & delete stops
     }
 
