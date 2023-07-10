@@ -126,7 +126,6 @@ class ParameterInput {
         this.id = null;
         this.default_value = default_value;
         this.initial_value = null;
-        this.element = null;
     }
 
     inflate(wrapper) {
@@ -139,10 +138,7 @@ class ParameterInput {
         let wrapper = document.createElement("div");
         wrapper.classList.add("panel-input");
         this.inflate(wrapper);
-        container.appendChild(wrapper);
-        var self = this;
-        this.element.addEventListener("input", () => { self.oninput(); });
-        wrapper.addEventListener("dblclick", () => { self.ondblclick(); });
+        container.appendChild(wrapper);        
     }
 
     read() {
@@ -159,15 +155,6 @@ class ParameterInput {
         this.reference.on_input_update();
     }
 
-    oninput() {
-        this.update(); 
-    }
-
-    ondblclick() {
-        this.write(this.default_value);
-        this.update();
-    }
-
 }
 
 
@@ -175,46 +162,59 @@ class RangeParameterInput extends ParameterInput {
 
     constructor(reference, name, label, default_value, min, max, step, transform) {
         super(reference, name, label, default_value);
+        this.input_range = null;
+        this.input_number = null;
         this.min = min;
         this.max = max;
         this.step = step;
         this.transform = transform;
-        this.value_span = null;
     }
 
     inflate(wrapper) {
         wrapper.classList.add("panel-input-range");
-        this.element = document.createElement("input");
-        this.element.id = this.id;
-        this.element.type = "range";
-        this.element.min = this.min;
-        this.element.max = this.max;
-        this.element.step = this.step;
-        this.element.value = this.initial_value;
+        this.input_number = document.createElement("input");
+        this.input_number.id = this.id;
+        this.input_number.type = "number";
+        this.input_number.min = this.min;
+        this.input_number.max = this.max;
+        this.input_number.step = this.step;
+        this.input_number.value = this.initial_value;
+        this.input_range = document.createElement("input");
+        this.input_range.type = "range";
+        this.input_range.min = this.min;
+        this.input_range.max = this.max;
+        this.input_range.step = this.step;
+        this.input_range.value = this.initial_value;
         let label = document.createElement("label");
         label.setAttribute("for", this.id);
         label.textContent = this.label;
         wrapper.appendChild(label);
-        wrapper.appendChild(this.element);
-        this.value_span = document.createElement("span");
-        this.value_span.textContent = this.initial_value;
-        wrapper.appendChild(this.value_span);
+        wrapper.appendChild(this.input_range);
+        wrapper.appendChild(this.input_number);
+        var self = this;
+        this.input_range.addEventListener("input", () => {
+            self.input_number.value = self.input_range.value;
+            self.update();
+        });
+        this.input_range.addEventListener("dblclick", () => {
+            self.write(self.default_value);
+            self.update();
+        });
+        this.input_number.addEventListener("input", () => {
+            self.input_range.value = self.input_number.value;
+            self.update();
+        });
     }
 
     read() {
-        let base = is_integer(this.step) ? parseInt(this.element.value) : parseFloat(this.element.value);
+        let base = is_integer(this.step) ? parseInt(this.input_number.value) : parseFloat(this.input_number.value);
         if (this.transform != undefined) return this.transform(base);
         return base;
     }
 
-    oninput() {
-        super.oninput();
-        this.value_span.textContent = this.read();
-    }
-
     write(value) {
-        this.element.value = value;
-        this.value_span.textContent = value;
+        this.input_number.value = value;
+        this.input_range.value = value;
     }
 
 }
@@ -223,13 +223,14 @@ class SelectParameterInput extends ParameterInput {
 
     constructor(reference, name, label, options) {
         super(reference, name, label, null)
+        this.select = null;
         this.options = options;
     }
 
     inflate(wrapper) {
         wrapper.classList.add("panel-input-select");
-        this.element = document.createElement("select");
-        this.element.id = this.id;
+        this.select = document.createElement("select");
+        this.select.id = this.id;
         this.options.forEach(option_text => {
             let option = document.createElement("option");
             option.value = option_text;
@@ -237,47 +238,54 @@ class SelectParameterInput extends ParameterInput {
             if (option_text == this.initial_value) {
                 option.selected = true;
             }
-            this.element.appendChild(option);
+            this.select.appendChild(option);
         });
         let label = document.createElement("label");
         label.setAttribute("for", this.id);
         label.textContent = this.label;
         wrapper.appendChild(label);
-        wrapper.appendChild(this.element);
+        wrapper.appendChild(this.select);
+        var self = this;
+        this.select.addEventListener("input", () => { self.update(); });
     }
 
     read() {
-        let options = this.element.querySelectorAll("option");
+        let options = this.select.querySelectorAll("option");
         for (let i = 0; i < options.length; i++) {
             if (options[i].selected) return options[i].value;
         }
     }
 
     write(value) {
-        this.element.querySelectorAll("option").forEach(option => {
+        this.select.querySelectorAll("option").forEach(option => {
             option.selected = option.value == value;
         });
     }
-
-    ondblclick() {}
 
 }
 
 class BooleanParameterInput extends ParameterInput {
 
+    constructor(reference, name, label) {
+        super(reference, name, label, null);
+        this.input = null;
+    }
+
     inflate(wrapper) {
         wrapper.classList.add("panel-input-boolean");
-        this.element = document.createElement("input");
-        this.element.id = this.id;
-        this.element.type = "checkbox";
+        this.input = document.createElement("input");
+        this.input.id = this.id;
+        this.input.type = "checkbox";
         if (this.initial_value) {
-            this.element.checked = true;
+            this.input.checked = true;
         }
         let label = document.createElement("label");
         label.setAttribute("for", this.id);
         label.textContent = this.label;
-        wrapper.appendChild(this.element);
+        wrapper.appendChild(this.input);
         wrapper.appendChild(label);
+        var self = this;
+        this.input.addEventListener("input", () => { self.update(); });
     }
 
     read() {
@@ -287,9 +295,6 @@ class BooleanParameterInput extends ParameterInput {
     write(value) {
         this.element.checked = value;
     }
-
-    ondblclick() {}
-
 }
 
 function random_seed() {
@@ -298,37 +303,41 @@ function random_seed() {
 
 class SeedParameterInput extends ParameterInput {
 
+    constructor(reference, name, label) {
+        super(reference, name, label, 0);
+        this.input = null;
+    }
+
     inflate(wrapper) {
         wrapper.classList.add("panel-input-seed");
-        this.element = document.createElement("input");
-        this.element.id = this.id;
-        this.element.type = "number";
-        this.element.step = 1;
-        this.element.value = this.initial_value;
+        this.input = document.createElement("input");
+        this.input.id = this.id;
+        this.input.type = "number";
+        this.input.step = 1;
+        this.input.value = this.initial_value;
         let label = document.createElement("label");
         label.setAttribute("for", this.id);
         label.textContent = this.label;
         let button = document.createElement("button");
         button.textContent = "Random";
         var self = this;
+        this.input.addEventListener("input", () => { self.update(); })
         button.addEventListener("click", () => {
             self.write(random_seed());
             self.update();
         });
         wrapper.appendChild(label);
-        wrapper.appendChild(this.element);
+        wrapper.appendChild(this.input);
         wrapper.appendChild(button);
     }
 
     read() {
-        return parseInt(this.element.value);
+        return parseInt(this.input.value);
     }
 
     write(value) {
-        this.element.value = value;
+        this.input.value = value;
     }
-
-    ondblclick() {}
 
 }
 
@@ -565,34 +574,21 @@ class SplineParameterInput extends ParameterInput {
 
     inflate(wrapper) {
         this.controls = obj_arr_cpy(this.initial_value);
-        this.element = document.createElement("canvas");
-        this.element.width = this.width;
-        this.element.height = this.height;
-        this.context = this.element.getContext("2d");
-        wrapper.appendChild(this.element);
+        this.canvas = document.createElement("canvas");
+        this.canvas.width = this.width;
+        this.canvas.height = this.height;
+        this.context = this.canvas.getContext("2d");
+        wrapper.appendChild(this.canvas);
         this.draw();
         var self = this;
-        this.element.addEventListener("click", (e) => { self.on_click(e) });
-        this.element.addEventListener("dblclick", (e) => { self.on_dblclick(e) });
+        //this.canvas.addEventListener("click", (e) => { self.on_click(e) });
+        this.canvas.addEventListener("dblclick", (e) => { self.on_dblclick(e) });
         wrapper.addEventListener("mousedown", (e) => { self.on_mousedown(e) });
         window.addEventListener("mousemove", (e) => { self.on_mousemove(e) });
         window.addEventListener("mouseup", (e) => { self.on_mouseup(e) });
     }
 
-    on_click(event) {
-        let target = this.get_click_target(event);
-        if (event.ctrlKey) {
-            if (target.control != null && target.control > 1) {
-                this.controls.splice(target.control, 1);
-            } else if (target.control == null) {
-                this.controls.push(new ControlPoint(target.x, target.y));
-            }
-        }
-        this.update();
-    }
-
     on_dblclick(event) {
-        //TODO: check
         let target = this.get_click_target(event);
         if (target.bezier_control != null) {
             event.preventDefault();
@@ -604,13 +600,25 @@ class SplineParameterInput extends ParameterInput {
             }
             this.update();
             return false;
+        } else {
+            this.write(this.default_value);
+            this.update();
         }
     }
 
     on_mousedown(event) {
         let target = this.get_click_target(event);
         if (target.control != null && !event.shiftKey) {
-            this.moving_control = target.control;
+            if (event.ctrlKey && target.control > 1) {
+                this.controls.splice(target.control, 1);
+                this.update();
+            } else {
+                this.moving_control = target.control;
+            }
+        } else if (target.control == null && !event.shiftKey && target.bezier_control == null) {
+            this.controls.push(new ControlPoint(target.x, target.y));
+            this.update();
+            this.moving_control = this.controls.length - 1;
         } else if (target.bezier_control != null) {
             this.moving_bezier_control = target.bezier_control;
         } else if (event.shiftKey) {
