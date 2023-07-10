@@ -361,6 +361,11 @@ class Controller {
         this.output_panel.update();
     }
 
+    on_noise_panel_input_update() {
+        //Noise panel is responsible for updating itself beforehand
+        this.output_panel.update();
+    }
+
     get_input_id() {
         this.input_counter++;
         return this.input_counter;
@@ -902,7 +907,8 @@ class NoisePanel {
     }
 
     on_input_update() {
-        this.controller.update();
+        this.update();
+        this.controller.on_noise_panel_input_update();
     }
 
 }
