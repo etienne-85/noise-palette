@@ -116,7 +116,6 @@ function gradient_at(master_seed, j, i) {
     return new Vect2(0, 1).rot(prng * 2 * Math.PI);
 }
 
-
 class ParameterInput {
 
     constructor(reference, name, label, default_value) {
@@ -149,14 +148,18 @@ class ParameterInput {
         throw new Error("Not implemented!");
     }
 
-    update() {
+    update(propagate=true) {
         let value = this.read();
         this.reference.config[this.name] = value;
-        this.reference.on_input_update();
+        if (propagate) this.reference.on_input_update();
+    }
+
+    reset() {
+        this.write(this.default_value);
+        this.update(false);
     }
 
 }
-
 
 class RangeParameterInput extends ParameterInput {
 
@@ -221,8 +224,8 @@ class RangeParameterInput extends ParameterInput {
 
 class SelectParameterInput extends ParameterInput {
 
-    constructor(reference, name, label, options) {
-        super(reference, name, label, null)
+    constructor(reference, name, label, default_value, options) {
+        super(reference, name, label, default_value)
         this.select = null;
         this.options = options;
     }
@@ -266,8 +269,8 @@ class SelectParameterInput extends ParameterInput {
 
 class BooleanParameterInput extends ParameterInput {
 
-    constructor(reference, name, label) {
-        super(reference, name, label, null);
+    constructor(reference, name, label, default_value) {
+        super(reference, name, label, default_value);
         this.input = null;
     }
 
@@ -289,11 +292,11 @@ class BooleanParameterInput extends ParameterInput {
     }
 
     read() {
-        return this.element.checked;
+        return this.input.checked;
     }
 
     write(value) {
-        this.element.checked = value;
+        this.input.checked = value;
     }
 }
 
@@ -303,8 +306,8 @@ function random_seed() {
 
 class SeedParameterInput extends ParameterInput {
 
-    constructor(reference, name, label) {
-        super(reference, name, label, 0);
+    constructor(reference, name, label, default_value) {
+        super(reference, name, label, default_value);
         this.input = null;
     }
 
@@ -341,28 +344,41 @@ class SeedParameterInput extends ParameterInput {
 
 }
 
-
 class Controller {
     
-    constructor(config) {
-        this.noise_panels = [];
+    constructor(config={}) {
         this.config = {
             width: 400,
             height: 400
         };
-        this.output_panel = new OutputPanel(this);
         for (let key in config) {
             this.config[key] = config[key];
         }
         this.input_counter = 0;
+        this.noise_counter = 0;
+        this.header_bar = new HeaderBar(this);
+        this.noise_panels = [];
+        this.output_panel = new OutputPanel(this);
     }
 
     setup() {
+        let header_container = document.getElementById("header");
+        this.header_bar.setup(header_container);
         let panels_container = document.getElementById("panels");
         this.noise_panels.forEach(panel => {
             panel.setup(panels_container);
         });
         this.output_panel.setup(panels_container);
+    }
+
+    add_noise_panel() {
+        let panel = new NoisePanel(this, this.noise_counter);
+        this.noise_counter++;
+        let panels_container = document.getElementById("panels");
+        panel.setup(panels_container);
+        panel.update();
+        this.noise_panels.push(panel);
+        this.output_panel.update();
     }
 
     update() {
@@ -378,6 +394,51 @@ class Controller {
     get_input_id() {
         this.input_counter++;
         return this.input_counter;
+    }
+
+    reset() {
+        this.header_bar.reset();
+        this.noise_panels.forEach(panel => {
+            panel.reset();
+        });
+        this.output_panel.reset();
+    }
+
+    delete_noise_panel(index) {
+        if (this.noise_panels.length == 1) {
+            this.noise_panels[0].reset();
+        } else {
+            for (let i = 0; i < this.noise_panels.length; i++) {
+                if (this.noise_panels[i].index != index) continue;
+                this.noise_panels[i].panel.parentElement.removeChild(this.noise_panels[i].panel);
+                this.noise_panels.splice(i, 1);
+                this.output_panel.update();
+                break;
+            }
+        }
+    }
+
+    export() {
+        let scale = 1;
+        let export_canvas = document.createElement("canvas");
+        let width = scale * this.config.width;
+        let height = scale * this.config.height;
+        export_canvas.width = width;
+        export_canvas.height = height;
+        let source_imagedata = this.output_panel.context.getImageData(0, 0, this.config.width, this.config.height);
+        let export_context = export_canvas.getContext("2d");
+        let export_imagedata = export_context.getImageData(0, 0, width, height);
+        for (let i = 0; i < height; i++) {
+            for (let j = 0; j < width; j++) {
+                let sk = (Math.floor(i / scale) * this.config.width + Math.floor(j / scale)) * 4;
+                let dk = (i * width + j) * 4;
+                for (let l = 0; l < 4; l++) {
+                    export_imagedata.data[dk + l] = source_imagedata.data[sk + l];
+                }
+            }
+        }
+        export_context.putImageData(export_imagedata, 0, 0);
+        window.open(export_canvas.toDataURL("image/png"), "_blank").focus();
     }
 
 }
@@ -523,8 +584,8 @@ function collides(a, b, tol) {
 
 class SplineParameterInput extends ParameterInput {
 
-    constructor(reference, name, label) {
-        super(reference, name, label, [new ControlPoint(0, 0), new ControlPoint(1, 1)]);
+    constructor(reference, name, label, default_value) {
+        super(reference, name, label, default_value);
         this.controls = null;
         this.padding = 8;
         this.width = 256;
@@ -732,6 +793,7 @@ class SplineParameterInput extends ParameterInput {
 
     write(value) {
         this.controls = obj_arr_cpy(value);
+        this.draw();
     }
 
     update() {
@@ -807,11 +869,51 @@ class PerlinNoise {
 
 }
 
-class NoisePanel {
+class HeaderBar {
 
     constructor(controller, config={}) {
         this.controller = controller;
-        this.canvas = null;
+    }
+
+    setup(container) {
+        let wrapper = document.createElement("div");
+        wrapper.classList.add("header-bar");
+        container.appendChild(wrapper);
+
+        var self = this;
+
+        let button_reset = document.createElement("button");
+        button_reset.textContent = "Reset";
+        button_reset.addEventListener("click", () => {
+            self.controller.reset();
+        });
+        wrapper.appendChild(button_reset);
+
+        let button_add = document.createElement("button");
+        button_add.textContent = "Add noise";
+        button_add.addEventListener("click", () => {
+            self.controller.add_noise_panel();
+        });
+        wrapper.appendChild(button_add);
+
+        let button_export = document.createElement("button");
+        button_export.textContent = "Export";
+        button_export.addEventListener("click", () => {
+            self.controller.export();
+        });
+        wrapper.appendChild(button_export);
+    }
+
+    reset() { }
+
+}
+
+class NoisePanel {
+
+    constructor(controller, index, config={}) {
+        this.controller = controller;
+        this.index = index;
+        this.panel = null;
         this.context = null;
         this.inputs = [];
         this.values = null;
@@ -832,29 +934,46 @@ class NoisePanel {
     }
 
     setup(container) {
-        let panel = document.createElement("div");
-        panel.classList.add("panel");
-        panel.classList.add("panel-noise");
-        this.canvas = document.createElement("canvas");
-        this.canvas.classList.add("panel-canvas");
-        this.canvas.width = this.width;
-        this.canvas.height = this.height;
-        panel.appendChild(this.canvas);
-        this.context = this.canvas.getContext("2d");
+        var self = this;
+        this.panel = document.createElement("div");
+        this.panel.classList.add("panel");
+        this.panel.classList.add("panel-noise");
+        let buttons_container = document.createElement("div");
+        buttons_container.classList.add("panel-buttons");
+        let reset_button = document.createElement("button");
+        reset_button.textContent = "Reset";
+        reset_button.addEventListener("click", () => { self.reset(); });
+        buttons_container.appendChild(reset_button);
+        let delete_button = document.createElement("button");
+        delete_button.textContent = "Delete";
+        delete_button.addEventListener("click", () => { self.delete(); });
+        buttons_container.appendChild(delete_button);
+        this.panel.appendChild(buttons_container);
+        let canvas = document.createElement("canvas");
+        canvas.classList.add("panel-canvas");
+        canvas.width = this.width;
+        canvas.height = this.height;
+        this.panel.appendChild(canvas);
+        this.context = canvas.getContext("2d");
         let panel_inputs = document.createElement("div");
         panel_inputs.classList.add("panel-inputs");
-        this.inputs.push(new SeedParameterInput(this, "seed", "Seed"));
+        this.inputs.push(new SeedParameterInput(this, "seed", "Seed", 0));
         this.inputs.push(new RangeParameterInput(this, "scale", "Scale", 64, 8, 512, 1));
         this.inputs.push(new RangeParameterInput(this, "harmonics", "Harmonics", 0, 0, 4, 1));
         this.inputs.push(new RangeParameterInput(this, "harmonic_spread", "Harmonic Spread", 2, 0, 4, 0.01));
         this.inputs.push(new RangeParameterInput(this, "harmonic_gain", "Harmonic Gain", 1, 0, 2, 0.01));
-        this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", ["linear", "smooth", "smoother"]));
-        this.inputs.push(new SplineParameterInput(this, "spline", "Spline"));
+        this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]));
+        this.inputs.push(new SplineParameterInput(this, "spline", "Spline", [new ControlPoint(0, 0), new ControlPoint(1, 1)]));
         this.inputs.forEach(input => {
             input.setup(panel_inputs);
         });
-        panel.appendChild(panel_inputs);
-        container.appendChild(panel);
+        this.panel.appendChild(panel_inputs);
+        let panel_output = container.querySelector(".panel-output");
+        if (panel_output == null) {
+            container.appendChild(this.panel);
+        } else {
+            container.insertBefore(this.panel, panel_output);
+        }
     }
 
     update_values() {
@@ -919,6 +1038,17 @@ class NoisePanel {
         this.controller.on_noise_panel_input_update();
     }
 
+    reset() {
+        this.inputs.forEach(input => {
+            input.reset();
+        });
+        this.on_input_update();
+    }
+
+    delete() {
+        this.controller.delete_noise_panel(this.index);
+    }
+
 }
 
 class OutputPanel {
@@ -940,7 +1070,7 @@ class OutputPanel {
     setup(container) {
         let panel = document.createElement("div");
         panel.classList.add("panel");
-        panel.classList.add("panel-ouput");
+        panel.classList.add("panel-output");
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("panel-canvas");
         this.canvas.width = this.width;
@@ -984,14 +1114,17 @@ class OutputPanel {
         this.controller.update();
     }
 
+    reset() {}
+
 }
+
+var controller;
 
 function on_load() {
     console.log("Hello, World!");
-    let controller = new Controller();
-    controller.noise_panels.push(new NoisePanel(controller));
-    controller.noise_panels.push(new NoisePanel(controller));
+    controller = new Controller();
     controller.setup();
+    controller.add_noise_panel();
     controller.update();
 }
 
