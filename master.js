@@ -21,6 +21,10 @@ class Vect2 {
         return Math.pow(Math.pow(this.x, p) + Math.pow(this.y, p), 1/p);
     }
 
+    distance(other) {
+        return this.sub(other).norm();
+    }
+
     copy() {
         return new Vect2(this.x, this.y);
     }
@@ -35,7 +39,16 @@ class Vect2 {
             -this.x * Math.sin(theta) + this.y * Math.cos(theta));
     }
 
-    minus(other) {
+    add(other) {
+        return new Vect2(this.x + other.x, this.y + other.y);
+    }
+
+    add_inplace(other) {
+        this.x += other.x;
+        this.y += other.y;
+    }
+
+    sub(other) {
         // returns this - other
         return new Vect2(this.x - other.x, this.y - other.y);
     }
@@ -356,13 +369,29 @@ class Controller {
 }
 
 
-function cubic_bezier(P0, P1, P2, P3, x, tol=0.0001) {
+function obj_arr_cpy(arr) {
+    let out = [];
+    arr.forEach(x => {
+        out.push(x.copy());
+    });
+    return out;
+}
+
+
+function lerp(P0, P1, x) {
+    let t = (x - P0.x) / (P1.x - P0.x);
+    return (1 - t) * P0.y + t * P1.y;
+}
+
+
+function cubic_bezier(P0, P1, P2, P3, x, tol=.001) {
     let maxt = 1;
     let mint = 0;
     let t = 0.5;
+    let z = 0;
     while (true) {
         t = (maxt + mint) / 2;
-        let z = P0[0] * (1 - t) ** 3 + 3 * P1[0] * t * (1 - t) ** 2 + 3 * P2[0] * (1 - t) * t ** 2 + P3[0] * t ** 3;
+        z = P0.x * (1 - t) ** 3 + 3 * P1.x * t * (1 - t) ** 2 + 3 * P2.x * (1 - t) * t ** 2 + P3.x * t ** 3;
         if (Math.abs(z - x) < tol) break;
         if (z < x) {
             mint = t;
@@ -370,43 +399,119 @@ function cubic_bezier(P0, P1, P2, P3, x, tol=0.0001) {
             maxt = t;
         }
     }
-    return P0[1] * (1 - t) ** 3 + 3 * P1[1] * t * (1 - t) ** 2 + 3 * P2[1] * (1 - t) * t ** 2 + P3[1] * t ** 3;
+    return P0.y * (1 - t) ** 3 + 3 * P1.y * t * (1 - t) ** 2 + 3 * P2.y * (1 - t) * t ** 2 + P3.y * t ** 3;
 }
-
 
 class Spline {
     constructor(controls) {
-        this.controls = [...controls];
-        this.controls.sort((a, b) => { return a[0] - b[0] });
+        this.controls = obj_arr_cpy(controls);
+        this.controls.sort((a, b) => { return a.x - b.x });
+        this.precooked = false;
+        this.tol = 0.001;
+        this.precooked_values = null;
+    }
+
+    precook() {
+        this.precooked_values = [];
+        let n = (1 / this.tol) + 1;
+        for (let i = 0; i < n; i++) {
+            let t = i / (n - 1);
+            this.precooked_values.push(this.eval(t));
+        }
+        this.precooked = true;
+    }
+
+    interpolate(P0, P1, x) {
+        if (P0.bezier_next == null && P1.bezier_prev == null) {
+            return lerp(P0, P1, x);
+        } else if (P0.bezier_next == null) {
+            return cubic_bezier(P0, P0, P1.bezier_prev, P1, x, this.tol);
+        } else if (P1.bezier_prev == null) {
+            return cubic_bezier(P0, P0.bezier_next, P1, P1, x, this.tol);
+        } else {
+            return cubic_bezier(P0, P0.bezier_next, P1.bezier_prev, P1, x, this.tol);
+        }
     }
 
     eval(t) {
         let x = Math.min(1, Math.max(0, t));
-        let i0 = 0;
+        if (this.precooked) {
+            return this.precooked_values[Math.floor(x / this.tol)];
+        }
         for (let i = 0; i < this.controls.length; i++) {
-            if (this.controls[i][0] == x) return this.controls[i][1];
-            if (i < this.controls.length - 1 && this.controls[i][0] < x && this.controls[i + 1][0] > x) {
-                i0 = i;
-                break;
+            if (this.controls[i].x == x) return this.controls[i].y;
+            if (i < this.controls.length - 1 && this.controls[i].x < x && this.controls[i + 1].x > x) {
+                return this.interpolate(this.controls[i], this.controls[i + 1], x);
             }
         }
-        let i1 = i0 + 1;
-        let y = cubic_bezier(
-            [this.controls[i0][0], this.controls[i0][1]],
-            [this.controls[i0][4], this.controls[i0][5]],
-            [this.controls[i1][2], this.controls[i1][3]],
-            [this.controls[i1][0], this.controls[i1][1]],
-            x,
-        )
-        return y;
     }
 }
+
+
+class ControlPoint extends Vect2 {
+
+    constructor(x, y) {
+        super(x, y);
+        this.bezier_prev = null;
+        this.bezier_next = null;
+    }
+
+    copy() {
+        let cp = new ControlPoint(this.x, this.y);
+        if (this.bezier_prev != null) {
+            cp.bezier_prev = this.bezier_prev.copy();
+        }
+        if (this.bezier_next != null) {
+            cp.bezier_next = this.bezier_next.copy();
+        }
+        return cp;
+    }
+
+    draw_bezier(context, height, inner_width, inner_height, padding, dot_size, x0, y0, point) {
+        let x1 = point.x * inner_width + padding - dot_size / 2;
+        let y1 = height - (point.y * inner_height + padding + dot_size / 2);
+        context.fillStyle = "red";
+        context.strokeStyle = "red";
+        context.beginPath();
+        context.arc(x1 + dot_size / 2, y1 + dot_size / 2, .45 * dot_size, 0, 2 * Math.PI);
+        context.fill();
+        context.beginPath();
+        context.moveTo(x0 + dot_size / 2, y0 + dot_size / 2);
+        context.lineTo(x1 + dot_size / 2, y1 + dot_size / 2);
+        context.stroke();
+    }
+
+    draw(context, height, inner_width, inner_height, padding, dot_size) {
+        let x0 = this.x * inner_width + padding - dot_size / 2;
+        let y0 = height - (this.y * inner_height + padding + dot_size / 2);
+        if (this.bezier_prev != null) {
+            this.draw_bezier(context, height, inner_width, inner_height, padding, dot_size, x0, y0, this.bezier_prev);
+        }
+        if (this.bezier_next != null) {
+            this.draw_bezier(context, height, inner_width, inner_height, padding, dot_size, x0, y0, this.bezier_next);
+        }
+        context.fillStyle = "black";
+        context.fillRect(x0, y0, dot_size, dot_size);
+    }
+
+}
+
+
+const BEZIER_PREV = 0;
+const BEZIER_NEXT = 1;
+
+
+function collides(a, b, tol) {
+    if (a == null || b == null) return false;
+    return a.distance(b) < tol;
+}
+
 
 class SplineParameterInput extends ParameterInput {
 
     constructor(reference, name, label) {
-        super(reference, name, label, [[0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1]]);
-        this.controls = [[0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1]];
+        super(reference, name, label, [new ControlPoint(0, 0), new ControlPoint(1, 1)]);
+        this.controls = null;
         this.padding = 8;
         this.width = 256;
         this.height = 256;
@@ -418,30 +523,27 @@ class SplineParameterInput extends ParameterInput {
 
     get_click_target(event, collisions=true) {
         let bounds = event.target.getBoundingClientRect();
-        let x = (event.clientX - bounds.left - this.padding) / (this.width - 2 * this.padding);
-        let y = 1 - (event.clientY - bounds.top - this.padding) / (this.width - 2 * this.padding);
+        let target = new Vect2(
+            (event.clientX - bounds.left - this.padding) / (this.width - 2 * this.padding),
+            1 - (event.clientY - bounds.top - this.padding) / (this.width - 2 * this.padding),
+        );
+        target.control = null;
+        target.bezier_control = null;
         let hitbox = this.dot_size / (this.width - 2 * this.padding) / 1.5;
-        let control = null;
-        let bezier_control = null;
         if (collisions) {
             for (let i = 0; i < this.controls.length; i++) {
-                if (Math.abs(this.controls[i][0] - x) < hitbox && Math.abs(this.controls[i][1] - y) < hitbox) {
-                    control = i;
+                if (collides(this.controls[i], target, hitbox)) {
+                    target.control = i;
                 }
-                if (Math.abs(this.controls[i][2] - x) < hitbox && Math.abs(this.controls[i][3] - y) < hitbox) {
-                    bezier_control = { control: i, index: 0 };
+                if (collides(this.controls[i].bezier_prev, target, hitbox)) {
+                    target.bezier_control = { control: i, index: BEZIER_PREV };
                 }
-                if (Math.abs(this.controls[i][4] - x) < hitbox && Math.abs(this.controls[i][5] - y) < hitbox) {
-                    bezier_control = { control: i, index: 1 };
+                if (collides(this.controls[i].bezier_next, target, hitbox)) {
+                    target.bezier_control = { control: i, index: BEZIER_NEXT };
                 }
             }
         }
-        return {
-            x: x,
-            y: y,
-            control: control,
-            bezier_control: bezier_control,
-        }
+        return target;
     }
 
     get_closest_control(target) {
@@ -449,33 +551,15 @@ class SplineParameterInput extends ParameterInput {
         for (let i = 0; i < this.controls.length; i++) {
             controls.push({
                 index: i,
-                distance: Math.abs(this.controls[i][0] - target.x) + Math.abs(this.controls[i][1] - target.y)
+                distance: this.controls[i].distance(target)
             });
         }
         controls.sort((a, b) => { return a.distance - b.distance });
         return controls[0].index;
     }
 
-    get_closest_bezier_control(target) {
-        let bezier_controls = [];
-        for (let i = 0; i < this.controls.length; i++) {
-            bezier_controls.push({
-                control: i,
-                index: 0,
-                distance: Math.abs(this.controls[i][2] - target.x) + Math.abs(this.controls[i][3] - target.y)
-            });
-            bezier_controls.push({
-                control: i,
-                index: 1,
-                distance: Math.abs(this.controls[i][4] - target.x) + Math.abs(this.controls[i][5] - target.y)
-            });
-        }
-        bezier_controls.sort((a, b) => { return a.distance - b.distance });
-        return bezier_controls[0];
-    }
-
     inflate(wrapper) {
-        this.controls = [...this.initial_value];
+        this.controls = obj_arr_cpy(this.initial_value);
         this.element = document.createElement("canvas");
         this.element.width = this.width;
         this.element.height = this.height;
@@ -483,91 +567,105 @@ class SplineParameterInput extends ParameterInput {
         wrapper.appendChild(this.element);
         this.draw();
         var self = this;
-        this.element.addEventListener("click", (event) => {
-            let target = self.get_click_target(event);
-            if (event.ctrlKey) {
-                self.on_ctrl_click(target);
-            }
-            self.update();
-        });
-        this.element.addEventListener("dblclick", (event) => {
-            let target = self.get_click_target(event);
-            if (target.bezier_control != null) {
-                event.preventDefault();
-                event.stopPropagation();
-                if (target.bezier_control.index == 0) {
-                    self.controls[target.bezier_control.control][2] = self.controls[target.bezier_control.control][0];
-                    self.controls[target.bezier_control.control][3] = self.controls[target.bezier_control.control][1];
-                } else {
-                    self.controls[target.bezier_control.control][4] = self.controls[target.bezier_control.control][0];
-                    self.controls[target.bezier_control.control][5] = self.controls[target.bezier_control.control][1];
-                }
-                self.update();
-                return false;
-            }
-        });
-        window.addEventListener("mousedown", (event) => {
-            let target = self.get_click_target(event);
-            if (target.control != null && !event.shiftKey) {
-                self.moving_control = target.control;
-            } else if (target.bezier_control != null) {
-                self.moving_bezier_control = target.bezier_control;
-            } else if (event.shiftKey) {
-                let closest_control = self.get_closest_control(target);
-                if (self.controls[closest_control][0] > target.x) {
-                    self.moving_bezier_control = { control: closest_control, index: 0 };
-                } else {
-                    self.moving_bezier_control = { control: closest_control, index: 1 };
-                }
-            }
-        });
-        wrapper.addEventListener("mousemove", (event) => {
-            if (self.moving_control != null) {
-                let target = self.get_click_target(event, false);
-                let prevx = self.controls[self.moving_control][0];
-                let prevy = self.controls[self.moving_control][1];
-                if (self.moving_control > 1) {
-                    self.controls[self.moving_control][0] = Math.min(1, Math.max(0, target.x));
-                }
-                self.controls[self.moving_control][1] = Math.min(1, Math.max(0, target.y));
-                let dx = self.controls[self.moving_control][0] - prevx;
-                let dy = self.controls[self.moving_control][1] - prevy;
-                self.controls[self.moving_control][2] += dx;
-                self.controls[self.moving_control][3] += dy;
-                self.controls[self.moving_control][4] += dx;
-                self.controls[self.moving_control][5] += dy;
-                self.update();
-            } else if (self.moving_bezier_control != null) {
-                let target = self.get_click_target(event, false);
-                if (self.moving_bezier_control.index == 0) {
-                    self.controls[self.moving_bezier_control.control][2] = target.x;
-                    self.controls[self.moving_bezier_control.control][3] = target.y;
-                } else {
-                    self.controls[self.moving_bezier_control.control][4] = target.x;
-                    self.controls[self.moving_bezier_control.control][5] = target.y;
-                }
-                self.update();
-            }
-        });
-        window.addEventListener("mouseup", (event) => {
-            self.moving_control = null;
-            self.moving_bezier_control = null;
-            //TODO: also make the final move
-        });
+        this.element.addEventListener("click", (e) => { self.on_click(e) });
+        this.element.addEventListener("dblclick", (e) => { self.on_dblclick(e) });
+        wrapper.addEventListener("mousedown", (e) => { self.on_mousedown(e) });
+        window.addEventListener("mousemove", (e) => { self.on_mousemove(e) });
+        window.addEventListener("mouseup", (e) => { self.on_mouseup(e) });
     }
 
-    on_ctrl_click(target) {
-        if (target.control != null && target.control > 1) {
-            this.controls.splice(target.control, 1);
-        } else if (target.control == null) {
-            this.controls.push([target.x, target.y, target.x, target.y, target.x, target.y]);
+    on_click(event) {
+        let target = this.get_click_target(event);
+        if (event.ctrlKey) {
+            if (target.control != null && target.control > 1) {
+                this.controls.splice(target.control, 1);
+            } else if (target.control == null) {
+                this.controls.push(new ControlPoint(target.x, target.y));
+            }
+        }
+        this.update();
+    }
+
+    on_dblclick(event) {
+        //TODO: check
+        let target = this.get_click_target(event);
+        if (target.bezier_control != null) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (target.bezier_control.index == 0) {
+                this.controls[target.bezier_control.control].bezier_prev = null;
+            } else {
+                this.controls[target.bezier_control.control].bezier_next = null;
+            }
+            this.update();
+            return false;
         }
     }
 
-    draw() {
-        let spline = new Spline(this.controls);
-        this.context.clearRect(0, 0, this.width, this.height);
+    on_mousedown(event) {
+        let target = this.get_click_target(event);
+        if (target.control != null && !event.shiftKey) {
+            this.moving_control = target.control;
+        } else if (target.bezier_control != null) {
+            this.moving_bezier_control = target.bezier_control;
+        } else if (event.shiftKey) {
+            let closest_control_index = this.get_closest_control(target);
+            let cc = this.controls[closest_control_index];
+            if (cc.x > target.x) {
+                this.moving_bezier_control = { control: closest_control_index, index: BEZIER_PREV };
+                if (cc.bezier_prev == null) {
+                    cc.bezier_prev = new Vect2(cc.x, cc.y);
+                }
+            } else {
+                this.moving_bezier_control = { control: closest_control_index, index: BEZIER_NEXT };
+                if (cc.bezier_next == null) {
+                    cc.bezier_next = new Vect2(cc.x, cc.y);
+                }
+            }
+        }
+    }
 
+    on_control_drag(target) {
+        let prev = this.controls[this.moving_control].copy();
+        if (this.moving_control > 1) {
+            this.controls[this.moving_control].x = Math.min(1, Math.max(0, target.x));
+        }
+        this.controls[this.moving_control].y = Math.min(1, Math.max(0, target.y));
+        let dxy = this.controls[this.moving_control].sub(prev);
+        if (this.controls[this.moving_control].bezier_prev != null) {
+            this.controls[this.moving_control].bezier_prev.add_inplace(dxy);
+        }
+        if (this.controls[this.moving_control].bezier_next != null) {
+            this.controls[this.moving_control].bezier_next.add_inplace(dxy);
+        }
+    }
+
+    on_bezier_control_drag(target) {
+        if (this.moving_bezier_control.index == BEZIER_PREV) {
+            this.controls[this.moving_bezier_control.control].bezier_prev = target.copy();
+        } else {
+            this.controls[this.moving_bezier_control.control].bezier_next = target.copy();
+        }
+    }
+
+    on_mousemove(event) {
+        if (this.moving_control != null || this.moving_bezier_control != null) {
+            let target = this.get_click_target(event, false);
+            if (this.moving_control != null) {
+                this.on_control_drag(target);
+            } else {
+                this.on_bezier_control_drag(target);
+            }
+            this.update();
+        }
+    }
+
+    on_mouseup(event) {
+        this.moving_control = null;
+        this.moving_bezier_control = null;
+    }
+
+    draw_grid() {
         this.context.strokeStyle = "grey";
         this.context.lineWidth = 0.75;
         this.context.beginPath();
@@ -592,13 +690,18 @@ class SplineParameterInput extends ParameterInput {
         this.context.moveTo(this.padding, 3 * this.height / 4);
         this.context.lineTo(this.width - this.padding, 3 * this.height / 4);
         this.context.stroke();
+    }
 
+    draw() {
+        let spline = new Spline(this.controls);
+        this.context.clearRect(0, 0, this.width, this.height);
+        this.draw_grid();
         this.context.lineWidth = 1;
         this.context.strokeStyle = "black";
-        this.context.beginPath();
         let inner_width = this.width - 2 * this.padding;
         let inner_height = this.height - 2 * this.padding;
         let ystart = spline.eval(0) * inner_height;
+        this.context.beginPath();
         this.context.moveTo(this.padding, this.height - ystart - this.padding);
         for (let i = 1; i < inner_width; i++) {
             let y = spline.eval(i / (inner_width - 1)) * inner_height + this.padding;
@@ -606,30 +709,7 @@ class SplineParameterInput extends ParameterInput {
         }
         this.context.stroke();
         this.controls.forEach(control => {
-            let x0 = control[0] * inner_width + this.padding - this.dot_size / 2;
-            let y0 = this.height - (control[1] * inner_height + this.padding + this.dot_size / 2);
-            let x1 = control[2] * inner_width + this.padding - this.dot_size / 2;
-            let y1 = this.height - (control[3] * inner_height + this.padding + this.dot_size / 2);
-            let x2 = control[4] * inner_width + this.padding - this.dot_size / 2;
-            let y2 = this.height - (control[5] * inner_height + this.padding + this.dot_size / 2);
-            this.context.fillStyle = "red";
-            this.context.strokeStyle = "red";
-            this.context.beginPath();
-            this.context.arc(x1 + this.dot_size / 2, y1 + this.dot_size / 2, .45 * this.dot_size, 0, 2 * Math.PI);
-            this.context.fill();
-            this.context.beginPath();
-            this.context.moveTo(x0 + this.dot_size / 2, y0 + this.dot_size / 2);
-            this.context.lineTo(x1 + this.dot_size / 2, y1 + this.dot_size / 2);
-            this.context.stroke();
-            this.context.beginPath();
-            this.context.arc(x2 + this.dot_size / 2, y2 + this.dot_size / 2, .45 * this.dot_size, 0, 2 * Math.PI);
-            this.context.fill();
-            this.context.beginPath();
-            this.context.moveTo(x0 + this.dot_size / 2, y0 + this.dot_size / 2);
-            this.context.lineTo(x2 + this.dot_size / 2, y2 + this.dot_size / 2);
-            this.context.stroke();
-            this.context.fillStyle = "black";
-            this.context.fillRect(x0, y0, this.dot_size, this.dot_size);
+            control.draw(this.context, this.height, inner_width, inner_height, this.padding, this.dot_size);
         });
     }
 
@@ -638,7 +718,7 @@ class SplineParameterInput extends ParameterInput {
     }
 
     write(value) {
-        this.controls = [...value];
+        this.controls = obj_arr_cpy(value);
     }
 
     update() {
@@ -728,7 +808,7 @@ class NoisePanel {
             seed: random_seed(),
             scale: 64,
             interpolation: "smoother",
-            spline: [[0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1]],
+            spline: [new ControlPoint(0, 0), new ControlPoint(1, 1)],
             harmonics: 0,
             harmonic_spread: 2,
             harmonic_gain: 0.5,
@@ -766,6 +846,7 @@ class NoisePanel {
 
     update_values() {
         let spline = new Spline(this.config.spline);
+        spline.precook();
         let scale = this.config.scale;
         let amplitude = 1;
         let total_amplitude = 0;
