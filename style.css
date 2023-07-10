@@ -176,7 +176,7 @@ select {
     overflow: visible;
 }
 
-.panel-input-spline canvas { 
+.panel canvas { 
     border: 1px solid var(--border-dim);
 }
 
@@ -186,4 +186,49 @@ select {
 
 .panel-buttons > *:last-child {
     margin-right: .4rem;
+}
+
+.panel-input-colormapping {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.panel-input-colormapping-stops-up,
+.panel-input-colormapping-stops-down {
+    position: relative;
+    width: 256px;
+    height: 2rem;
+}
+
+.panel-input-colormapping-stops-up {
+    margin-bottom: .2rem;
+}
+
+.panel-input-colormapping-stops-down {
+    margin-top: .2rem;
+}
+
+.colorstop-cursor,
+.colorstop-input {
+    position: absolute;
+    transform: translateX(-50%);
+}
+
+.colorstop-cursor {
+    bottom: 0;
+    width: 0;
+    height: 0;
+    border-left: .8rem solid transparent;
+    border-right: .8rem solid transparent;
+    border-top: 1rem solid black;
+    cursor: grab;
+}
+
+.colorstop-input {
+    top: 0;
+    width: 1rem;
+    border: none;
 }
