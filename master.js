@@ -391,7 +391,7 @@ class Controller {
         this.output_panel = new OutputPanel(this, this.config.width, this.config.height);
     }
 
-    save_config() {
+    get_config_string() {
         let config_dict = {
             controller: this.config,
             noise_panels: [],
@@ -400,7 +400,11 @@ class Controller {
         this.noise_panels.forEach(panel => {
             config_dict.noise_panels.push(panel.config);
         });
-        let config_string = JSON.stringify(config_dict);
+        return JSON.stringify(config_dict);
+    }
+
+    save_config() {
+        let config_string = this.get_config_string();
         localStorage.setItem(STORAGE_CONFIG_KEY, config_string);
     }
 
@@ -459,7 +463,11 @@ class Controller {
     }
 
     export_config() {
-        //TODO
+        let config_string = this.get_config_string();
+        let link = document.createElement("a");
+        link.setAttribute("download",`noise-palette-config-${parseInt((new Date()) * 1)}.json`);
+        link.href = "data:application/json;base64," + btoa(config_string);
+        link.click();
     }
 
     setup() {
@@ -1548,6 +1556,13 @@ class OutputPanel {
             document.getElementById("modal-export").classList.add("active");
         });
         buttons_container.appendChild(button_export);
+
+        let button_save = document.createElement("button");
+        button_save.textContent = "Save";
+        button_save.addEventListener("click", () => {
+            self.controller.export_config();
+        });
+        buttons_container.appendChild(button_save);
 
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("panel-canvas");
