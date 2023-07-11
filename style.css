@@ -278,3 +278,25 @@ select {
 .modal-footer {
     margin-top: .4rem;
 }
+
+.contextmenu {
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+}
+
+.contextmenu-entry {
+    background: var(--background-secondary);
+    padding: .4rem;
+    border-bottom: 1px solid var(--border-dim);
+    cursor: pointer;
+}
+
+.contextmenu-entry:hover {
+    background: var(--background-primary);
+}
+
+.contextmenu-entry:last-child {
+    border-bottom: none;
+}

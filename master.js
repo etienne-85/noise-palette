@@ -159,6 +159,29 @@ class ParameterInput {
         this.update(false);
     }
 
+    create_context_menu(event, preset_list) {
+        event.preventDefault();
+        clear_context_menus();
+        let menu = document.createElement("div");
+        menu.classList.add("contextmenu");
+        var self = this;
+        preset_list.forEach(preset => {
+            let option = document.createElement("span");
+            option.classList.add("contextmenu-entry");
+            option.textContent = preset.name;
+            option.addEventListener("click", () => {
+                document.body.removeChild(menu);
+                self.write(preset.value);
+                self.update();
+            });
+            menu.appendChild(option);
+        });
+        document.body.appendChild(menu);
+        let bounds = menu.getBoundingClientRect();
+        menu.style.left = event.clientX + "px";
+        menu.style.top = Math.min(event.clientY, window.innerHeight - bounds.height) + "px";
+    }
+
 }
 
 class RangeParameterInput extends ParameterInput {
@@ -535,10 +558,10 @@ class Spline {
 
 class ControlPoint extends Vect2 {
 
-    constructor(x, y) {
+    constructor(x, y, bprev=null, bnext=null) {
         super(x, y);
-        this.bezier_prev = null;
-        this.bezier_next = null;
+        this.bezier_prev = bprev;
+        this.bezier_next = bnext;
     }
 
     copy() {
@@ -590,6 +613,47 @@ function collides(a, b, tol) {
     if (a == null || b == null) return false;
     return a.distance(b) < tol;
 }
+
+
+function generate_step_controls(n) {
+    let controls = [new ControlPoint(0, 0)];
+    let y = 0;
+    for (let i = 0; i < n; i++) {
+        let x = (i + 1) / (n + 1); 
+        controls.push(new ControlPoint(x - 0.0001, y));
+        y = (i + 1) / n;
+        controls.push(new ControlPoint(x, y));
+    }
+    controls.push(new ControlPoint(1, 1));
+    return controls;
+}
+
+
+function generate_contours_controls(n) {
+    let width = Math.min(0.05, 1 / n / 4);
+    let controls = [new ControlPoint(0, 0)];
+    for (let i = 0; i < n; i++) {
+        let x = (i + 1) / (n + 1);
+        controls.push(new ControlPoint(x - width, 0));
+        controls.push(new ControlPoint(x, 1));
+        controls.push(new ControlPoint(x + width, 0));
+    }
+    controls.push(new ControlPoint(1, 0));
+    return controls;
+}
+
+
+const PRESETS_SPLINES = [
+    { name: "default", value: [new ControlPoint(0, 0), new ControlPoint(1, 1)] },
+    { name: "step1", value: generate_step_controls(1)},
+    { name: "step2", value: generate_step_controls(2)},
+    { name: "step3", value: generate_step_controls(3)},
+    { name: "contrast", value: [new ControlPoint(0, 0, null, new Vect2(1, 0)), new ControlPoint(1, 1, new Vect2(0, 1), null)] },
+    { name: "contours1", value: generate_contours_controls(1) },
+    { name: "contours5", value: generate_contours_controls(5) },
+    { name: "contours11", value: generate_contours_controls(11) },
+    { name: "contours15", value: generate_contours_controls(15) },
+];
 
 
 class SplineParameterInput extends ParameterInput {
@@ -654,11 +718,11 @@ class SplineParameterInput extends ParameterInput {
         wrapper.appendChild(this.canvas);
         this.draw();
         var self = this;
-        //this.canvas.addEventListener("click", (e) => { self.on_click(e) });
         this.canvas.addEventListener("dblclick", (e) => { self.on_dblclick(e) });
-        wrapper.addEventListener("mousedown", (e) => { self.on_mousedown(e) });
+        wrapper.addEventListener("mousedown", (e) => { if (e.button == 0) self.on_mousedown(e) });
         window.addEventListener("mousemove", (e) => { self.on_mousemove(e) });
-        window.addEventListener("mouseup", (e) => { self.on_mouseup(e) });
+        window.addEventListener("mouseup", (e) => { if (e.button == 0) self.on_mouseup(e) });
+        wrapper.addEventListener("contextmenu", (e) => { self.on_contextmenu(e); });
     }
 
     on_dblclick(event) {
@@ -749,6 +813,10 @@ class SplineParameterInput extends ParameterInput {
     on_mouseup(event) {
         this.moving_control = null;
         this.moving_bezier_control = null;
+    }
+
+    on_contextmenu(event) {
+        this.create_context_menu(event, PRESETS_SPLINES);
     }
 
     draw_grid() {
@@ -1186,7 +1254,43 @@ class ColorMapping {
 function hexToRgb(hex) {
     var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16), 255 ];
-  }
+}
+
+
+const PRESETS_COLORMAPPINGS = [
+    {
+        name: "default",
+        value: [
+            new ColorStop(0, [0, 0, 0, 255]),
+            new ColorStop(1, [255, 255, 255, 255])
+        ]
+    },
+    {
+        name: "rainbow",
+        value: [
+            new ColorStop(0, [102, 48, 144, 255]),
+            new ColorStop(0.1667, [8, 115, 187, 255]),
+            new ColorStop(0.3333, [0, 173, 241, 255]),
+            new ColorStop(0.5, [117, 212, 66, 255]),
+            new ColorStop(0.6667, [253, 249, 20, 255]),
+            new ColorStop(0.8333, [252, 162, 22, 255]),
+            new ColorStop(1, [254, 19, 26, 255]),
+        ]
+    },
+    {
+        name: "terrain",
+        value: [
+            new ColorStop(0, [13, 29, 55, 255]), // deep sea
+            new ColorStop(0.49, [8, 115, 187, 255]), // water
+            new ColorStop(0.5, [249, 209, 153, 255]), // beach
+            new ColorStop(0.53, [65, 152, 10, 255]), // grass
+            new ColorStop(0.69, [127, 112, 83, 255]), // grass-dirt frontier
+            new ColorStop(0.7, [155, 118, 83, 255]), // dirt
+            new ColorStop(0.75, [176, 169, 163, 255]), // stone
+            new ColorStop(0.76, [255, 255, 255, 255]), // snow
+        ]
+    }
+]
 
 
 class ColorMappingParameterInput extends ParameterInput {
@@ -1231,12 +1335,15 @@ class ColorMappingParameterInput extends ParameterInput {
             self.grabbing = null;
         });
         wrapper.addEventListener("click", (event) => {
-            if (event.ctrlKey) {
+            if (event.button == 0 && event.ctrlKey) {
                 let bounds = self.canvas.getBoundingClientRect();
                 let stop = new ColorStop((event.clientX - bounds.left) / self.width, [0, 0, 0, 255]);
                 self.stops.push(stop);
                 self.update();
             }
+        });
+        wrapper.addEventListener("contextmenu", (event) => {
+            self.create_context_menu(event, PRESETS_COLORMAPPINGS);
         });
     }
 
@@ -1271,11 +1378,13 @@ class ColorMappingParameterInput extends ParameterInput {
             cursor.classList.add("colorstop-cursor");
             cursor.style.left = `${ (stop.t * 100).toFixed(3) }%`;
             cursor.addEventListener("mousedown", (event) => {
-                if (event.ctrlKey) {
-                    self.delete_stop(stop.t);
-                } else {
-                    self.grabbing = stop;
-                    self.grabstart = event.clientX;
+                if (event.button == 0) {
+                    if (event.ctrlKey) {
+                        self.delete_stop(stop.t);
+                    } else {
+                        self.grabbing = stop;
+                        self.grabstart = event.clientX;
+                    }
                 }
             });
             this.stops_container_up.appendChild(cursor);
@@ -1396,6 +1505,13 @@ class OutputPanel {
 
 }
 
+function clear_context_menus() {
+    let context_menus = document.querySelectorAll(".contextmenu");
+    for (let i = 0; i < context_menus.length; i++) {
+        document.body.removeChild(context_menus[i]);
+    }
+}
+
 var controller;
 
 function on_load() {
@@ -1407,6 +1523,7 @@ function on_load() {
     document.querySelector("#modal-export .modal-overlay").addEventListener("click", () => {
         document.getElementById("modal-export").classList.remove("active");
     });
+    window.addEventListener("click", clear_context_menus);
 }
 
 window.addEventListener("load", on_load);
