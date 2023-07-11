@@ -885,22 +885,24 @@ class SplineParameterInput extends ParameterInput {
 
 class PerlinNoise {
 
-    constructor(width, height, seed, period, interpolation) {
+    constructor(width, height, seed, period, interpolation, offset_x, offset_y) {
         this.width = width;
         this.height = height;
         this.seed = seed;
         this.period = period;
         this.interpolation = interpolation;
+        this.offset_x = offset_x;
+        this.offset_y = offset_y;
         this.gradients = null;
         this.values = null;
     }
 
     compute_gradients() {
         this.gradients = [];
-        let jstart = Math.floor(-this.width / 2 / this.period) - 1;
-        let jend = Math.floor(this.width / 2 / this.period) + 1;
-        let istart = Math.floor(-this.height / 2 / this.period) - 1;
-        let iend = Math.floor(this.height / 2 / this.period) + 1;
+        let jstart = Math.floor((-this.width / 2 - this.offset_x) / this.period) - 1;
+        let jend = Math.floor((this.width / 2 - this.offset_x) / this.period) + 1;
+        let istart = Math.floor((-this.height / 2 - this.offset_y) / this.period) - 1;
+        let iend = Math.floor((this.height / 2 - this.offset_y) / this.period) + 1;
         for (let i = istart; i <= iend; i++) {
             this.gradients.push([]);
             for (let j = jstart; j <= jend; j++) {
@@ -919,13 +921,13 @@ class PerlinNoise {
             interp = interp_smoother;
         }
         this.values = [];
-        let jstart = Math.floor(-this.width / 2 / this.period) - 1;
-        let istart = Math.floor(-this.height / 2 / this.period) - 1;
+        let jstart = Math.floor((-this.width / 2 - this.offset_x) / this.period) - 1;
+        let istart = Math.floor((-this.height / 2 - this.offset_y) / this.period) - 1;
         for (let py = 0; py < this.height; py++) {
             this.values.push([]);
             for (let px = 0; px < this.width; px++) {
-                let j = (px - this.width / 2) / this.period - jstart;
-                let i = (py - this.height / 2) / this.period - istart;
+                let j = (px - this.width / 2 - this.offset_x) / this.period - jstart;
+                let i = (py - this.height / 2 - this.offset_y) / this.period - istart;
                 let j0 = Math.floor(j);
                 let i0 = Math.floor(i);
                 let j1 = j0 + 1;
@@ -1036,6 +1038,8 @@ class NoisePanel {
             negative: false,
             blend_mode: "addition",
             blend_weight: 1,
+            offset_x: 0,
+            offset_y: 0,
         }
         for (let key in config) {
             this.config[key] = config[key];
@@ -1067,6 +1071,8 @@ class NoisePanel {
         let panel_inputs = document.createElement("div");
         panel_inputs.classList.add("panel-inputs");
         this.inputs.push(new SeedParameterInput(this, "seed", "Seed", 0));
+        this.inputs.push(new RangeParameterInput(this, "offset_x", "Offset X", 0, -this.width, this.width, 1));
+        this.inputs.push(new RangeParameterInput(this, "offset_y", "Offset Y", 0, -this.height, this.height, 1));
         this.inputs.push(new RangeParameterInput(this, "period", "Period", 64, 8, 512, 1));
         this.inputs.push(new RangeParameterInput(this, "harmonics", "Harmonics", 0, 0, 7, 1));
         this.inputs.push(new RangeParameterInput(this, "harmonic_spread", "Harmonic Spread", 2, 0, 4, 0.01));
@@ -1096,7 +1102,7 @@ class NoisePanel {
         let total_amplitude = 0;
         let harmonics = [];
         for (let k = 0; k <= this.config.harmonics; k++) {
-            let harmonic = new PerlinNoise(this.width, this.height, this.config.seed * (k + 1), period, this.config.interpolation);
+            let harmonic = new PerlinNoise(this.width, this.height, this.config.seed * (k + 1), period, this.config.interpolation, this.config.offset_x, this.config.offset_y);
             harmonic.compute();
             harmonics.push(harmonic);
             period /= this.config.harmonic_spread;
