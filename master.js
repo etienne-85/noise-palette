@@ -1223,6 +1223,14 @@ class ColorMappingParameterInput extends ParameterInput {
         window.addEventListener("mouseup", (event) => {
             self.grabbing = null;
         });
+        wrapper.addEventListener("click", (event) => {
+            if (event.ctrlKey) {
+                let bounds = self.canvas.getBoundingClientRect();
+                let stop = new ColorStop((event.clientX - bounds.left) / self.width, [0, 0, 0, 255]);
+                self.stops.push(stop);
+                self.update();
+            }
+        });
     }
 
     draw() {
@@ -1235,9 +1243,9 @@ class ColorMappingParameterInput extends ParameterInput {
             if (j == Math.floor(this.width / 4)
                 || j == Math.floor(this.width / 2)
                 || j == Math.floor(3 * this.width / 4)) {
-                    color[0] = 255 - color[0];
-                    color[1] = 255 - color[1];
-                    color[2] = 255 - color[2];
+                    color[0] = (color[0] + 64) % 256;
+                    color[1] = (color[1] + 64) % 256;
+                    color[2] = (color[2] + 64) % 256;
             }
             for (let i = 0; i < this.height; i++) {
                 let k = ((i * this.width) + j) * 4;
@@ -1256,8 +1264,12 @@ class ColorMappingParameterInput extends ParameterInput {
             cursor.classList.add("colorstop-cursor");
             cursor.style.left = `${ (stop.t * 100).toFixed(3) }%`;
             cursor.addEventListener("mousedown", (event) => {
-                self.grabbing = stop;
-                self.grabstart = event.clientX;
+                if (event.ctrlKey) {
+                    self.delete_stop(stop.t);
+                } else {
+                    self.grabbing = stop;
+                    self.grabstart = event.clientX;
+                }
             });
             this.stops_container_up.appendChild(cursor);
             let input = document.createElement("input");
@@ -1271,7 +1283,16 @@ class ColorMappingParameterInput extends ParameterInput {
                 self.update();
             });
         });
-        //TODO: add & delete stops
+    }
+
+    delete_stop(t) {
+        for (let i = 0; i < this.stops.length; i++) {
+            if (this.stops[i].t == t) {
+                this.stops.splice(i, 1);
+                break;
+            }
+        }
+        this.update();
     }
 
     read() {
@@ -1301,7 +1322,7 @@ class OutputPanel {
         this.width = this.controller.config.width;
         this.height = this.controller.config.height;
         this.config = {
-            colormapping: [new ColorStop(0, [0, 0, 0, 255]), new ColorStop(0.5, [255, 0, 0, 255]), new ColorStop(1, [255, 255, 255, 255])],
+            colormapping: [new ColorStop(0, [0, 0, 0, 255]), new ColorStop(1, [255, 255, 255, 255])],
         }
         for (let key in config) {
             this.config[key] = config[key];
