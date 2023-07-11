@@ -104,7 +104,7 @@ class ColorMappingInput extends ParameterInput {
         this.stops = null;
         this.context = null;
         this.canvas = null;
-        this.width = 256;
+        this.width = 336;
         this.height = 32;
         this.stops_container_up = null;
         this.stops_container_down = null;

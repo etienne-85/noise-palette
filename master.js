@@ -226,6 +226,7 @@ class NoisePanel {
             offset_y: 0,
             scale_x: 1,
             scale_y: 1,
+            spread: 0,
         }
         for (let key in config) {
             this.config[key] = config[key];
@@ -279,24 +280,26 @@ class NoisePanel {
         panel_inputs.classList.add("panel-inputs");
         this.add_input_group("World", panel_inputs, [
             new SeedParameterInput(this, "seed", "Seed", 0),
+            new RangeParameterInput(this, "period", "Period", 64, 8, 512, 1),
             new RangeParameterInput(this, "offset_x", "Offset X", 0, -4*this.width, 4*this.width, 1),
             new RangeParameterInput(this, "offset_y", "Offset Y", 0, -4*this.height, 4*this.height, 1),
             new RangeParameterInput(this, "scale_x", "Scale X", 1, 0.01, 3, 0.01),
             new RangeParameterInput(this, "scale_y", "Scale Y", 1, 0.01, 3, 0.01),
+            new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]),
         ]);
-        this.add_input(panel_inputs, new RangeParameterInput(this, "period", "Period", 64, 8, 512, 1));
-        this.add_input(panel_inputs, new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]));
-        this.add_input_group("Octaves", panel_inputs, [
-            new RangeParameterInput(this, "harmonics", "Harmonics", 0, 0, 7, 1),
+        this.add_input_group("Harmonics", panel_inputs, [
+            new RangeParameterInput(this, "harmonics", "Harmonic Count", 0, 0, 7, 1),
             new RangeParameterInput(this, "harmonic_spread", "Harmonic Spread", 2, 0, 4, 0.01),
             new RangeParameterInput(this, "harmonic_gain", "Harmonic Gain", 0.5, 0, 2, 0.01),
         ]);
-        this.add_input(panel_inputs, new SplineInput(this, "spline", "Spline", [new ControlPoint(0, 0), new ControlPoint(1, 1)]));
+        this.add_input_group("Transform", panel_inputs, [
+            new RangeParameterInput(this, "spread", "Spread", 0, -3, 3, 0.01),
+            new SplineInput(this, "spline", "Spline", [new ControlPoint(0, 0), new ControlPoint(1, 1)]),
+        ]);
         this.add_input_group("Blending", panel_inputs, [
-            new BooleanParameterInput(this, "negative", "Negative", false),
-            new SelectParameterInput(this, "blend_mode", "Blend Mode", "addition", ["addition", "difference", "product", "brighter", "darker"]),
-            new RangeParameterInput(this, "blend_weight", "Blend Weight", 1, 0, 9, 0.01)
-        ]),
+            new SelectParameterInput(this, "blend_mode", "Blend Mode", "addition", ["addition", "difference", "product", "division", "brighter", "darker"]),
+            new RangeParameterInput(this, "blend_weight", "Blend Weight", 1, 0, 10, 0.01)
+        ]);
         this.panel.appendChild(panel_inputs);
         let panel_output = container.querySelector(".panel-output");
         if (panel_output == null) {
@@ -341,7 +344,11 @@ class NoisePanel {
                     this.values[i][j] += amplitude * harmonic.values[i][j];
                     amplitude *= this.config.harmonic_gain;
                 });
-                this.values[i][j] = spline.eval(this.values[i][j] / total_amplitude);
+                let base = this.values[i][j] / total_amplitude;
+                if (this.config.spread != 0) {
+                    base = ((base - 0.5) * 2 ** this.config.spread) + 0.5;
+                }
+                this.values[i][j] = spline.eval(base);
             }
         }
     }
@@ -368,6 +375,8 @@ class NoisePanel {
             this.compositor = (base, x, w) => base - w * x;
         } else if (this.config.blend_mode == "product") {
             this.compositor = (base, x, w) => base * w * x;
+        } else if (this.config.blend_mode == "division") {
+            this.compositor = (base, x, w) => base / (w * x);
         } else if (this.config.blend_mode == "brighter") {
             this.compositor = (base, x, w) => Math.max(base, w * x);
         } else if (this.config.blend_mode == "darker") {

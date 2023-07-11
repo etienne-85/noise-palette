@@ -326,7 +326,8 @@ class SplineInput extends ParameterInput {
 
     draw() {
         let spline = new Spline(this.controls);
-        this.context.clearRect(0, 0, this.width, this.height);
+        this.context.fillStyle = "white";
+        this.context.fillRect(0, 0, this.width, this.height);
         this.draw_grid();
         this.context.lineWidth = 1;
         this.context.strokeStyle = "black";
