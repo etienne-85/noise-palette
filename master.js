@@ -364,7 +364,7 @@ class Controller {
         this.noise_counter = 0;
         this.header_bar = new HeaderBar(this);
         this.noise_panels = [];
-        this.output_panel = new OutputPanel(this);
+        this.output_panel = new OutputPanel(this, this.config.width, this.config.height);
     }
 
     setup() {
@@ -375,26 +375,28 @@ class Controller {
             panel.setup(panels_container);
         });
         this.output_panel.setup(panels_container);
+        let self = this;
+        document.getElementById("button-export").addEventListener("click", () => { self.export(); })
     }
 
     add_noise_panel() {
-        let panel = new NoisePanel(this, this.noise_counter);
+        let panel = new NoisePanel(this, this.config.width, this.config.height, this.noise_counter);
         this.noise_counter++;
         let panels_container = document.getElementById("panels");
         panel.setup(panels_container);
         panel.update();
         this.noise_panels.push(panel);
-        this.output_panel.update();
+        this.output_panel.update(this.noise_panels);
     }
 
     update() {
         this.noise_panels.forEach(panel => { panel.update(); });
-        this.output_panel.update();
+        this.output_panel.update(this.noise_panels);
     }
 
     on_noise_panel_input_update() {
         //Noise panel is responsible for updating itself beforehand
-        this.output_panel.update();
+        this.output_panel.update(this.noise_panels);
     }
 
     get_input_id() {
@@ -418,33 +420,35 @@ class Controller {
                 if (this.noise_panels[i].index != index) continue;
                 this.noise_panels[i].panel.parentElement.removeChild(this.noise_panels[i].panel);
                 this.noise_panels.splice(i, 1);
-                this.output_panel.update();
+                this.output_panel.update(this.noise_panels);
                 break;
             }
         }
     }
 
     export() {
-        let scale = 1;
-        let export_canvas = document.createElement("canvas");
-        let width = scale * this.config.width;
-        let height = scale * this.config.height;
-        export_canvas.width = width;
-        export_canvas.height = height;
-        let source_imagedata = this.output_panel.context.getImageData(0, 0, this.config.width, this.config.height);
-        let export_context = export_canvas.getContext("2d");
-        let export_imagedata = export_context.getImageData(0, 0, width, height);
-        for (let i = 0; i < height; i++) {
-            for (let j = 0; j < width; j++) {
-                let sk = (Math.floor(i / scale) * this.config.width + Math.floor(j / scale)) * 4;
-                let dk = (i * width + j) * 4;
-                for (let l = 0; l < 4; l++) {
-                    export_imagedata.data[dk + l] = source_imagedata.data[sk + l];
-                }
-            }
-        }
-        export_context.putImageData(export_imagedata, 0, 0);
-        window.open(export_canvas.toDataURL("image/png"), "_blank").focus();
+        document.getElementById("modal-export").classList.remove("active");
+        document.getElementById("modal-wait").classList.add("active");
+        setTimeout(() => {
+            let width = parseInt(document.getElementById("input-export-width").value);
+            let height = parseInt(document.getElementById("input-export-height").value);
+            let precook = document.getElementById("input-export-precook").checked;
+            let export_noise_panels = [];
+            let dummy_container = document.createElement("div");
+            this.noise_panels.forEach((panel, i) => {
+                export_noise_panels.push(new NoisePanel(this, width, height, null, panel.config));
+                export_noise_panels[i].setup(dummy_container);
+                export_noise_panels[i].update(precook);
+            });
+            let export_output_panel = new OutputPanel(this, width, height, this.output_panel.config);
+            export_output_panel.setup(dummy_container);
+            export_output_panel.update(export_noise_panels, precook);
+            let link = document.createElement("a");
+            link.setAttribute("download", `noise-palette-${parseInt((new Date()) * 1)}.png`);
+            link.href = export_output_panel.canvas.toDataURL("image/png");
+            link.click();
+            document.getElementById("modal-wait").classList.remove("active");
+        }, 1);
     }
 
 }
@@ -907,7 +911,7 @@ class HeaderBar {
         let button_export = document.createElement("button");
         button_export.textContent = "Export";
         button_export.addEventListener("click", () => {
-            self.controller.export();
+            document.getElementById("modal-export").classList.add("active");
         });
         wrapper.appendChild(button_export);
     }
@@ -940,15 +944,18 @@ function cmp_darker(base, x, w) {
 
 class NoisePanel {
 
-    constructor(controller, index, config={}) {
+    constructor(controller, width, height, index, config={}) {
         this.controller = controller;
         this.index = index;
         this.panel = null;
         this.context = null;
         this.inputs = [];
         this.values = null;
-        this.width = this.controller.config.width;
-        this.height = this.controller.config.height;
+        this.width = width;
+        this.height = height;
+        if (this.width == null || this.width == undefined || this.height == null || this.height == undefined) {
+            throw new Error();
+        }
         this.compositor = null;
         this.config = {
             seed: random_seed(),
@@ -993,9 +1000,9 @@ class NoisePanel {
         panel_inputs.classList.add("panel-inputs");
         this.inputs.push(new SeedParameterInput(this, "seed", "Seed", 0));
         this.inputs.push(new RangeParameterInput(this, "scale", "Scale", 64, 8, 512, 1));
-        this.inputs.push(new RangeParameterInput(this, "harmonics", "Harmonics", 0, 0, 4, 1));
+        this.inputs.push(new RangeParameterInput(this, "harmonics", "Harmonics", 0, 0, 7, 1));
         this.inputs.push(new RangeParameterInput(this, "harmonic_spread", "Harmonic Spread", 2, 0, 4, 0.01));
-        this.inputs.push(new RangeParameterInput(this, "harmonic_gain", "Harmonic Gain", 1, 0, 2, 0.01));
+        this.inputs.push(new RangeParameterInput(this, "harmonic_gain", "Harmonic Gain", 0.5, 0, 2, 0.01));
         this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]));
         this.inputs.push(new SplineParameterInput(this, "spline", "Spline", [new ControlPoint(0, 0), new ControlPoint(1, 1)]));
         this.inputs.push(new BooleanParameterInput(this, "negative", "Negative", false));
@@ -1013,9 +1020,9 @@ class NoisePanel {
         }
     }
 
-    update_values() {
+    update_values(precook=true) {
         let spline = new Spline(this.config.spline);
-        spline.precook();
+        if (precook) spline.precook();
         let scale = this.config.scale;
         let amplitude = 1;
         let total_amplitude = 0;
@@ -1058,7 +1065,7 @@ class NoisePanel {
         this.context.putImageData(imagedata, 0, 0);
     }
 
-    update() {
+    update(precook=true) {
         if (this.config.blend_mode == "addition") {
             this.compositor = cmp_addition;
         } else if (this.config.blend_mode == "difference") {
@@ -1070,7 +1077,7 @@ class NoisePanel {
         } else if (this.config.blend_mode == "darker") {
             this.compositor = cmp_darker;
         } 
-        this.update_values();
+        this.update_values(precook);
         this.update_canvas();
         if (this.config.draw_grid) {
             this.draw_grid();
@@ -1313,14 +1320,17 @@ class ColorMappingParameterInput extends ParameterInput {
 
 class OutputPanel {
 
-    constructor(controller, config={}) {
+    constructor(controller, width, height, config={}) {
         this.controller = controller;
         this.canvas = null;
         this.context = null;
         this.inputs = [];
         this.values = null;
-        this.width = this.controller.config.width;
-        this.height = this.controller.config.height;
+        this.width = width;
+        this.height = height;
+        if (this.width == null || this.width == undefined || this.height == null || this.height == undefined) {
+            throw new Error();
+        }
         this.config = {
             colormapping: [new ColorStop(0, [0, 0, 0, 255]), new ColorStop(1, [255, 255, 255, 255])],
         }
@@ -1349,15 +1359,15 @@ class OutputPanel {
         container.appendChild(panel);
     }
 
-    update() {
+    update(noise_panels, precook=true) {
         let imagedata = new ImageData(this.width, this.height);
         let mapping = new ColorMapping(this.config.colormapping);
-        mapping.precook();
+        if (precook) mapping.precook();
         for (let py = 0; py < this.height; py++) {
             for (let px = 0; px < this.width; px++) {
                 let k = ((py * this.width) + px) * 4;
                 let value = 0;
-                this.controller.noise_panels.forEach(panel => {
+                noise_panels.forEach(panel => {
                     let z = panel.values[py][px];
                     value = panel.compositor(value, z, panel.config.blend_weight);
                 });
@@ -1394,6 +1404,9 @@ function on_load() {
     controller.setup();
     controller.add_noise_panel();
     controller.update();
+    document.querySelector("#modal-export .modal-overlay").addEventListener("click", () => {
+        document.getElementById("modal-export").classList.remove("active");
+    });
 }
 
 window.addEventListener("load", on_load);
