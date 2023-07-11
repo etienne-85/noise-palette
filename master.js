@@ -373,6 +373,8 @@ class SeedParameterInput extends ParameterInput {
 
 }
 
+const STORAGE_CONFIG_KEY = "noise_palette_config";
+
 class Controller {
     
     constructor(config={}) {
@@ -387,6 +389,77 @@ class Controller {
         this.noise_counter = 0;
         this.noise_panels = [];
         this.output_panel = new OutputPanel(this, this.config.width, this.config.height);
+    }
+
+    save_config() {
+        let config_dict = {
+            controller: this.config,
+            noise_panels: [],
+            output_panel: this.output_panel.config 
+        };
+        this.noise_panels.forEach(panel => {
+            config_dict.noise_panels.push(panel.config);
+        });
+        let config_string = JSON.stringify(config_dict);
+        localStorage.setItem(STORAGE_CONFIG_KEY, config_string);
+    }
+
+    load_config_from_storage() {
+        let item = localStorage.getItem(STORAGE_CONFIG_KEY);
+        if (item == null || item == "") return false;
+        let data = JSON.parse(item);
+        if (data == null) return false;
+        this.load_config(data);
+        return true;
+    }
+
+    load_config_from_url() {
+        //TODO
+    }
+
+    load_config_from_file() {
+        //TODO
+    }
+
+    load_config(config) {
+        this.config = config.controller;
+        this.noise_panels.forEach(panel => {
+            panel.panel.parentElement.removeChild(panel.panel);
+        });
+        this.input_counter = 0;
+        this.noise_counter = 0;
+        let panels_container = document.getElementById("panels");
+        panels_container.innerHTML = "";
+        this.noise_panels = [];
+        config.noise_panels.forEach(noise_panel_config => {
+            for (let i = 0; i < noise_panel_config.spline.length; i++) {
+                noise_panel_config.spline[i] = new ControlPoint(
+                    noise_panel_config.spline[i].x,
+                    noise_panel_config.spline[i].y,
+                    noise_panel_config.spline[i].bezier_prev == null ? null : new Vect2(noise_panel_config.spline[i].bezier_prev.x, noise_panel_config.spline[i].bezier_prev.y),
+                    noise_panel_config.spline[i].bezier_next == null ? null : new Vect2(noise_panel_config.spline[i].bezier_next.x, noise_panel_config.spline[i].bezier_next.y),
+                );
+            }
+            let panel = new NoisePanel(this, this.config.width, this.config.height, this.noise_counter, noise_panel_config);
+            this.noise_counter++;
+            this.noise_panels.push(panel);
+        });
+        this.noise_panels.forEach(panel => {
+            panel.setup(panels_container);
+        });
+        for (let i = 0; i < config.output_panel.colormapping.length; i++) {
+            config.output_panel.colormapping[i] = new ColorStop(
+                config.output_panel.colormapping[i].t,
+                config.output_panel.colormapping[i].color,
+            );
+        }
+        this.output_panel = new OutputPanel(this, this.config.width, this.config.height, config.output_panel);
+        this.output_panel.setup(panels_container);
+        this.update();
+    }
+
+    export_config() {
+        //TODO
     }
 
     setup() {
@@ -410,12 +483,19 @@ class Controller {
     }
 
     update() {
+        this.save_config();
         this.noise_panels.forEach(panel => { panel.update(); });
         this.output_panel.update(this.noise_panels);
     }
 
     on_noise_panel_input_update() {
+        this.save_config();
         //Noise panel is responsible for updating itself beforehand
+        this.output_panel.update(this.noise_panels);
+    }
+
+    on_output_panel_input_update() {
+        this.save_config();
         this.output_panel.update(this.noise_panels);
     }
 
@@ -429,6 +509,7 @@ class Controller {
             panel.reset();
         });
         this.output_panel.reset();
+        this.save_config();
     }
 
     delete_noise_panel(index) {
@@ -443,6 +524,7 @@ class Controller {
                 break;
             }
         }
+        this.save_config();
     }
 
     export() {
@@ -1515,7 +1597,7 @@ class OutputPanel {
 
     reset() {
         this.inputs.forEach(input => { input.reset() });
-        this.update();
+        this.controller.on_output_panel_input_update();
     }
 
 }
@@ -1533,8 +1615,10 @@ function on_load() {
     console.log("Hello, World!");
     controller = new Controller();
     controller.setup();
-    controller.add_noise_panel();
-    controller.update();
+    if (!controller.load_config_from_storage()) {
+        controller.add_noise_panel();
+        controller.update();
+    }
     document.querySelector("#modal-export .modal-overlay").addEventListener("click", () => {
         document.getElementById("modal-export").classList.remove("active");
     });
