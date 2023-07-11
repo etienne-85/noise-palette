@@ -198,8 +198,8 @@ class RangeParameterInput extends ParameterInput {
 
     inflate(wrapper) {
         wrapper.classList.add("panel-input-range");
-        let input_group = document.createElement("div");
-        input_group.classList.add("input-group");
+        let input_wrapper = document.createElement("div");
+        input_wrapper.classList.add("input-wrapper");
         this.input_number = document.createElement("input");
         this.input_number.id = this.id;
         this.input_number.type = "number";
@@ -217,9 +217,9 @@ class RangeParameterInput extends ParameterInput {
         label.setAttribute("for", this.id);
         label.textContent = this.label;
         wrapper.appendChild(label);
-        input_group.appendChild(this.input_range);
-        input_group.appendChild(this.input_number);
-        wrapper.appendChild(input_group);
+        input_wrapper.appendChild(this.input_range);
+        input_wrapper.appendChild(this.input_number);
+        wrapper.appendChild(input_wrapper);
         var self = this;
         this.input_range.addEventListener("input", () => {
             self.input_number.value = self.input_range.value;
@@ -339,8 +339,8 @@ class SeedParameterInput extends ParameterInput {
 
     inflate(wrapper) {
         wrapper.classList.add("panel-input-seed");
-        let input_group = document.createElement("div");
-        input_group.classList.add("input-group");
+        let input_wrapper = document.createElement("div");
+        input_wrapper.classList.add("input-wrapper");
         this.input = document.createElement("input");
         this.input.id = this.id;
         this.input.type = "number";
@@ -358,9 +358,9 @@ class SeedParameterInput extends ParameterInput {
             self.update();
         });
         wrapper.appendChild(label);
-        input_group.appendChild(this.input);
-        input_group.appendChild(button);
-        wrapper.appendChild(input_group);
+        input_wrapper.appendChild(this.input);
+        input_wrapper.appendChild(button);
+        wrapper.appendChild(input_wrapper);
     }
 
     read() {

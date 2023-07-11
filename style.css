@@ -134,7 +134,7 @@ select {
     margin-top: .4rem;
 }
 
-.input-group {
+.input-wrapper {
     display: flex;
     flex-direction: row;
     justify-content: flex-start;
@@ -142,19 +142,19 @@ select {
     box-sizing: border-box;
 }
 
-.input-group > * {
+.input-wrapper > * {
     margin-right: .4rem;
 }
 
-.input-group > *:last-child {
+.input-wrapper > *:last-child {
     margin-right: none;
 }
 
-.input-group button {
+.input-wrapper button {
     margin-top: 0;
 }
 
-.panel-input-range .input-group {
+.panel-input-range .input-wrapper {
     flex-direction: row-reverse;
     justify-content: flex-end;
 }
@@ -168,7 +168,7 @@ select {
     max-width: 3rem;
 }
 
-.panel .input-group {
+.panel .input-wrapper {
     margin-top: .4rem;
 }
 
