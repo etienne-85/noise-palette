@@ -885,11 +885,11 @@ class SplineParameterInput extends ParameterInput {
 
 class PerlinNoise {
 
-    constructor(width, height, seed, scale, interpolation) {
+    constructor(width, height, seed, period, interpolation) {
         this.width = width;
         this.height = height;
         this.seed = seed;
-        this.scale = scale;
+        this.period = period;
         this.interpolation = interpolation;
         this.gradients = null;
         this.values = null;
@@ -897,10 +897,10 @@ class PerlinNoise {
 
     compute_gradients() {
         this.gradients = [];
-        let jstart = Math.floor(-this.width / 2 / this.scale) - 1;
-        let jend = Math.floor(this.width / 2 / this.scale) + 1;
-        let istart = Math.floor(-this.height / 2 / this.scale) - 1;
-        let iend = Math.floor(this.height / 2 / this.scale) + 1;
+        let jstart = Math.floor(-this.width / 2 / this.period) - 1;
+        let jend = Math.floor(this.width / 2 / this.period) + 1;
+        let istart = Math.floor(-this.height / 2 / this.period) - 1;
+        let iend = Math.floor(this.height / 2 / this.period) + 1;
         for (let i = istart; i <= iend; i++) {
             this.gradients.push([]);
             for (let j = jstart; j <= jend; j++) {
@@ -919,13 +919,13 @@ class PerlinNoise {
             interp = interp_smoother;
         }
         this.values = [];
-        let jstart = Math.floor(-this.width / 2 / this.scale) - 1;
-        let istart = Math.floor(-this.height / 2 / this.scale) - 1;
+        let jstart = Math.floor(-this.width / 2 / this.period) - 1;
+        let istart = Math.floor(-this.height / 2 / this.period) - 1;
         for (let py = 0; py < this.height; py++) {
             this.values.push([]);
             for (let px = 0; px < this.width; px++) {
-                let j = (px - this.width / 2) / this.scale - jstart;
-                let i = (py - this.height / 2) / this.scale - istart;
+                let j = (px - this.width / 2) / this.period - jstart;
+                let i = (py - this.height / 2) / this.period - istart;
                 let j0 = Math.floor(j);
                 let i0 = Math.floor(i);
                 let j1 = j0 + 1;
@@ -1027,7 +1027,7 @@ class NoisePanel {
         this.compositor = null;
         this.config = {
             seed: random_seed(),
-            scale: 64,
+            period: 64,
             interpolation: "smoother",
             spline: [new ControlPoint(0, 0), new ControlPoint(1, 1)],
             harmonics: 0,
@@ -1067,7 +1067,7 @@ class NoisePanel {
         let panel_inputs = document.createElement("div");
         panel_inputs.classList.add("panel-inputs");
         this.inputs.push(new SeedParameterInput(this, "seed", "Seed", 0));
-        this.inputs.push(new RangeParameterInput(this, "scale", "Scale", 64, 8, 512, 1));
+        this.inputs.push(new RangeParameterInput(this, "period", "Period", 64, 8, 512, 1));
         this.inputs.push(new RangeParameterInput(this, "harmonics", "Harmonics", 0, 0, 7, 1));
         this.inputs.push(new RangeParameterInput(this, "harmonic_spread", "Harmonic Spread", 2, 0, 4, 0.01));
         this.inputs.push(new RangeParameterInput(this, "harmonic_gain", "Harmonic Gain", 0.5, 0, 2, 0.01));
@@ -1091,15 +1091,15 @@ class NoisePanel {
     update_values(precook=true) {
         let spline = new Spline(this.config.spline);
         if (precook) spline.precook();
-        let scale = this.config.scale;
+        let period = this.config.period;
         let amplitude = 1;
         let total_amplitude = 0;
         let harmonics = [];
         for (let k = 0; k <= this.config.harmonics; k++) {
-            let harmonic = new PerlinNoise(this.width, this.height, this.config.seed * (k + 1), scale, this.config.interpolation);
+            let harmonic = new PerlinNoise(this.width, this.height, this.config.seed * (k + 1), period, this.config.interpolation);
             harmonic.compute();
             harmonics.push(harmonic);
-            scale /= this.config.harmonic_spread;
+            period /= this.config.harmonic_spread;
             total_amplitude += amplitude;
             amplitude *= this.config.harmonic_gain;
         }
