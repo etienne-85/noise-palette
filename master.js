@@ -224,6 +224,8 @@ class NoisePanel {
             blend_weight: 1,
             offset_x: 0,
             offset_y: 0,
+            scale_x: 1,
+            scale_y: 1,
         }
         for (let key in config) {
             this.config[key] = config[key];
@@ -279,6 +281,8 @@ class NoisePanel {
             new SeedParameterInput(this, "seed", "Seed", 0),
             new RangeParameterInput(this, "offset_x", "Offset X", 0, -4*this.width, 4*this.width, 1),
             new RangeParameterInput(this, "offset_y", "Offset Y", 0, -4*this.height, 4*this.height, 1),
+            new RangeParameterInput(this, "scale_x", "Scale X", 1, 0.01, 3, 0.01),
+            new RangeParameterInput(this, "scale_y", "Scale Y", 1, 0.01, 3, 0.01),
         ]);
         this.add_input(panel_inputs, new RangeParameterInput(this, "period", "Period", 64, 8, 512, 1));
         this.add_input(panel_inputs, new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]));
@@ -310,7 +314,17 @@ class NoisePanel {
         let total_amplitude = 0;
         let harmonics = [];
         for (let k = 0; k <= this.config.harmonics; k++) {
-            let harmonic = new PerlinNoise(this.width, this.height, this.config.seed * (k + 1), period, this.config.interpolation, this.config.offset_x, this.config.offset_y);
+            let harmonic = new PerlinNoise(
+                this.width,
+                this.height,
+                this.config.seed * (k + 1),
+                period,
+                this.config.interpolation,
+                this.config.offset_x,
+                this.config.offset_y,
+                this.config.scale_x,
+                this.config.scale_y
+            );
             harmonic.compute();
             harmonics.push(harmonic);
             period /= this.config.harmonic_spread;

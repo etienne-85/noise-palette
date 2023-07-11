@@ -13,7 +13,7 @@ function interp_smoother(t, x0, x1) {
 
 class PerlinNoise {
 
-    constructor(width, height, seed, period, interpolation, offset_x, offset_y) {
+    constructor(width, height, seed, period, interpolation, offset_x, offset_y, scale_x, scale_y) {
         this.width = width;
         this.height = height;
         this.seed = seed;
@@ -21,16 +21,18 @@ class PerlinNoise {
         this.interpolation = interpolation;
         this.offset_x = offset_x;
         this.offset_y = offset_y;
+        this.scale_x = scale_x,
+        this.scale_y = scale_y;
         this.gradients = null;
         this.values = null;
     }
 
     compute_gradients() {
         this.gradients = [];
-        let jstart = Math.floor((-this.width / 2 - this.offset_x) / this.period) - 1;
-        let jend = Math.floor((this.width / 2 - this.offset_x) / this.period) + 1;
-        let istart = Math.floor((-this.height / 2 - this.offset_y) / this.period) - 1;
-        let iend = Math.floor((this.height / 2 - this.offset_y) / this.period) + 1;
+        let jstart = Math.floor((-this.width / 2 - this.offset_x) * this.scale_x / this.period) - 1;
+        let jend = Math.floor((this.width / 2 - this.offset_x) * this.scale_x / this.period) + 1;
+        let istart = Math.floor((-this.height / 2 - this.offset_y) * this.scale_y / this.period) - 1;
+        let iend = Math.floor((this.height / 2 - this.offset_y) * this.scale_y / this.period) + 1;
         for (let i = istart; i <= iend; i++) {
             this.gradients.push([]);
             for (let j = jstart; j <= jend; j++) {
@@ -49,13 +51,13 @@ class PerlinNoise {
             interp = interp_smoother;
         }
         this.values = [];
-        let jstart = Math.floor((-this.width / 2 - this.offset_x) / this.period) - 1;
-        let istart = Math.floor((-this.height / 2 - this.offset_y) / this.period) - 1;
+        let jstart = Math.floor((-this.width / 2 - this.offset_x) * this.scale_x / this.period) - 1;
+        let istart = Math.floor((-this.height / 2 - this.offset_y) * this.scale_y / this.period) - 1;
         for (let py = 0; py < this.height; py++) {
             this.values.push([]);
             for (let px = 0; px < this.width; px++) {
-                let j = (px - this.width / 2 - this.offset_x) / this.period - jstart;
-                let i = (py - this.height / 2 - this.offset_y) / this.period - istart;
+                let j = (px - this.width / 2 - this.offset_x) * this.scale_x / this.period - jstart;
+                let i = (py - this.height / 2 - this.offset_y) * this.scale_y / this.period - istart;
                 let j0 = Math.floor(j);
                 let i0 = Math.floor(i);
                 let j1 = j0 + 1;
