@@ -24,27 +24,10 @@ body {
     user-select: none;
 }
 
-#header {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 1em;
-}
-
-#header > * {
-    margin: 0 .4rem 0 0;
-}
-
-#header >*:last-child {
-    margin-right: none;
-}
-
 #panels {
     display: flex;
     flex-direction: row;
     justify-content: center;
-    overflow: hidden;
 }
 
 .panel {
@@ -314,4 +297,20 @@ select option:hover {
 
 .contextmenu-entry:last-child {
     border-bottom: none;
+}
+
+@media (max-width: 900px) {
+    #panels {
+        flex-direction: column;
+        width: fit-content;
+        max-width: 100%;
+        margin: auto;
+    }
+    .panel-noise {
+        border-right: 1px solid var(--border);
+        border-bottom: none;
+    }
+    .panel-output {
+        margin-bottom: 1em;
+    }
 }
