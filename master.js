@@ -385,14 +385,11 @@ class Controller {
         }
         this.input_counter = 0;
         this.noise_counter = 0;
-        this.header_bar = new HeaderBar(this);
         this.noise_panels = [];
         this.output_panel = new OutputPanel(this, this.config.width, this.config.height);
     }
 
     setup() {
-        let header_container = document.getElementById("header");
-        this.header_bar.setup(header_container);
         let panels_container = document.getElementById("panels");
         this.noise_panels.forEach(panel => {
             panel.setup(panels_container);
@@ -428,7 +425,6 @@ class Controller {
     }
 
     reset() {
-        this.header_bar.reset();
         this.noise_panels.forEach(panel => {
             panel.reset();
         });
@@ -951,45 +947,6 @@ class PerlinNoise {
 
 }
 
-class HeaderBar {
-
-    constructor(controller, config={}) {
-        this.controller = controller;
-    }
-
-    setup(container) {
-        let wrapper = document.createElement("div");
-        wrapper.classList.add("header-bar");
-        container.appendChild(wrapper);
-
-        var self = this;
-
-        let button_reset = document.createElement("button");
-        button_reset.textContent = "Reset";
-        button_reset.addEventListener("click", () => {
-            self.controller.reset();
-        });
-        wrapper.appendChild(button_reset);
-
-        let button_add = document.createElement("button");
-        button_add.textContent = "Add noise";
-        button_add.addEventListener("click", () => {
-            self.controller.add_noise_panel();
-        });
-        wrapper.appendChild(button_add);
-
-        let button_export = document.createElement("button");
-        button_export.textContent = "Export";
-        button_export.addEventListener("click", () => {
-            document.getElementById("modal-export").classList.add("active");
-        });
-        wrapper.appendChild(button_export);
-    }
-
-    reset() { }
-
-}
-
 
 function cmp_addition(base, x, w) {
     return base + w * x;
@@ -1482,6 +1439,34 @@ class OutputPanel {
         let panel = document.createElement("div");
         panel.classList.add("panel");
         panel.classList.add("panel-output");
+
+        var self = this;
+
+        let buttons_container = document.createElement("div");
+        buttons_container.classList.add("panel-buttons");
+        panel.appendChild(buttons_container);
+
+        let button_reset = document.createElement("button");
+        button_reset.textContent = "Reset";
+        button_reset.addEventListener("click", () => {
+            self.controller.reset();
+        });
+        buttons_container.appendChild(button_reset);
+
+        let button_add = document.createElement("button");
+        button_add.textContent = "Add noise";
+        button_add.addEventListener("click", () => {
+            self.controller.add_noise_panel();
+        });
+        buttons_container.appendChild(button_add);
+
+        let button_export = document.createElement("button");
+        button_export.textContent = "Export";
+        button_export.addEventListener("click", () => {
+            document.getElementById("modal-export").classList.add("active");
+        });
+        buttons_container.appendChild(button_export);
+
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("panel-canvas");
         this.canvas.width = this.width;
