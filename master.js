@@ -1046,6 +1046,27 @@ class NoisePanel {
         }
     }
 
+    add_input_group(name, base_container, inputs) {
+        let group_container = document.createElement("details");
+        group_container.classList.add("input-group");
+        let group_name = document.createElement("summary");
+        group_name.textContent = name;
+        group_container.appendChild(group_name);
+        let inputs_container = document.createElement("div");
+        inputs_container.classList.add("input-group-inputs");
+        inputs.forEach(input => {
+            this.inputs.push(input);
+            input.setup(inputs_container);
+        });
+        group_container.appendChild(inputs_container);
+        base_container.appendChild(group_container);
+    }
+
+    add_input(container, input) {
+        this.inputs.push(input);
+        input.setup(container);
+    }
+
     setup(container) {
         var self = this;
         this.panel = document.createElement("div");
@@ -1070,21 +1091,24 @@ class NoisePanel {
         this.context = canvas.getContext("2d");
         let panel_inputs = document.createElement("div");
         panel_inputs.classList.add("panel-inputs");
-        this.inputs.push(new SeedParameterInput(this, "seed", "Seed", 0));
-        this.inputs.push(new RangeParameterInput(this, "offset_x", "Offset X", 0, -this.width, this.width, 1));
-        this.inputs.push(new RangeParameterInput(this, "offset_y", "Offset Y", 0, -this.height, this.height, 1));
-        this.inputs.push(new RangeParameterInput(this, "period", "Period", 64, 8, 512, 1));
-        this.inputs.push(new RangeParameterInput(this, "harmonics", "Harmonics", 0, 0, 7, 1));
-        this.inputs.push(new RangeParameterInput(this, "harmonic_spread", "Harmonic Spread", 2, 0, 4, 0.01));
-        this.inputs.push(new RangeParameterInput(this, "harmonic_gain", "Harmonic Gain", 0.5, 0, 2, 0.01));
-        this.inputs.push(new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]));
-        this.inputs.push(new SplineParameterInput(this, "spline", "Spline", [new ControlPoint(0, 0), new ControlPoint(1, 1)]));
-        this.inputs.push(new BooleanParameterInput(this, "negative", "Negative", false));
-        this.inputs.push(new SelectParameterInput(this, "blend_mode", "Blend Mode", "addition", ["addition", "difference", "product", "brighter", "darker"]));
-        this.inputs.push(new RangeParameterInput(this, "blend_weight", "Blend Weight", 1, 0, 9, 0.01));
-        this.inputs.forEach(input => {
-            input.setup(panel_inputs);
-        });
+        this.add_input_group("World", panel_inputs, [
+            new SeedParameterInput(this, "seed", "Seed", 0),
+            new RangeParameterInput(this, "offset_x", "Offset X", 0, -4*this.width, 4*this.width, 1),
+            new RangeParameterInput(this, "offset_y", "Offset Y", 0, -4*this.height, 4*this.height, 1),
+        ]);
+        this.add_input(panel_inputs, new RangeParameterInput(this, "period", "Period", 64, 8, 512, 1));
+        this.add_input(panel_inputs, new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]));
+        this.add_input_group("Octaves", panel_inputs, [
+            new RangeParameterInput(this, "harmonics", "Harmonics", 0, 0, 7, 1),
+            new RangeParameterInput(this, "harmonic_spread", "Harmonic Spread", 2, 0, 4, 0.01),
+            new RangeParameterInput(this, "harmonic_gain", "Harmonic Gain", 0.5, 0, 2, 0.01),
+        ]);
+        this.add_input(panel_inputs, new SplineParameterInput(this, "spline", "Spline", [new ControlPoint(0, 0), new ControlPoint(1, 1)]));
+        this.add_input_group("Blending", panel_inputs, [
+            new BooleanParameterInput(this, "negative", "Negative", false),
+            new SelectParameterInput(this, "blend_mode", "Blend Mode", "addition", ["addition", "difference", "product", "brighter", "darker"]),
+            new RangeParameterInput(this, "blend_weight", "Blend Weight", 1, 0, 9, 0.01)
+        ]),
         this.panel.appendChild(panel_inputs);
         let panel_output = container.querySelector(".panel-output");
         if (panel_output == null) {
