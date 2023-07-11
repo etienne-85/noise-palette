@@ -417,12 +417,19 @@ class Controller {
         return true;
     }
 
-    load_config_from_url() {
-        //TODO
+    load_config_from_url(url) {
+        fetch(url).then(res => res.json()).then(data => {
+            this.load_config(data);
+        });
     }
 
     load_config_from_file() {
-        //TODO
+        let file_input = document.getElementById("input-load-file");
+        let files = file_input.files;
+        if (files.length > 0) {
+            this.load_config_from_url(URL.createObjectURL(files[0]));
+        }
+        document.getElementById("modal-open").classList.remove("active");
     }
 
     load_config(config) {
@@ -478,6 +485,7 @@ class Controller {
         this.output_panel.setup(panels_container);
         let self = this;
         document.getElementById("button-export").addEventListener("click", () => { self.export(); })
+        document.getElementById("button-load-config-file").addEventListener("click", () => { self.load_config_from_file(); })
     }
 
     add_noise_panel() {
@@ -1557,6 +1565,13 @@ class OutputPanel {
         });
         buttons_container.appendChild(button_export);
 
+        let button_open = document.createElement("button");
+        button_open.textContent = "Open";
+        button_open.addEventListener("click", () => {
+            document.getElementById("modal-open").classList.add("active");
+        });
+        buttons_container.appendChild(button_open);
+
         let button_save = document.createElement("button");
         button_save.textContent = "Save";
         button_save.addEventListener("click", () => {
@@ -1636,6 +1651,9 @@ function on_load() {
     }
     document.querySelector("#modal-export .modal-overlay").addEventListener("click", () => {
         document.getElementById("modal-export").classList.remove("active");
+    });
+    document.querySelector("#modal-open .modal-overlay").addEventListener("click", () => {
+        document.getElementById("modal-open").classList.remove("active");
     });
     window.addEventListener("click", clear_context_menus);
 }
