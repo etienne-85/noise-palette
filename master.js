@@ -68,14 +68,6 @@ class Controller {
         panels_container.innerHTML = "";
         this.noise_panels = [];
         config.noise_panels.forEach(noise_panel_config => {
-            for (let i = 0; i < noise_panel_config.spline.length; i++) {
-                noise_panel_config.spline[i] = new ControlPoint(
-                    noise_panel_config.spline[i].x,
-                    noise_panel_config.spline[i].y,
-                    noise_panel_config.spline[i].bezier_prev == null ? null : new Vec2(noise_panel_config.spline[i].bezier_prev.x, noise_panel_config.spline[i].bezier_prev.y),
-                    noise_panel_config.spline[i].bezier_next == null ? null : new Vec2(noise_panel_config.spline[i].bezier_next.x, noise_panel_config.spline[i].bezier_next.y),
-                );
-            }
             let panel = new NoisePanel(this, this.config.width, this.config.height, this.noise_counter, noise_panel_config);
             this.noise_counter++;
             this.noise_panels.push(panel);
@@ -83,12 +75,6 @@ class Controller {
         this.noise_panels.forEach(panel => {
             panel.setup(panels_container);
         });
-        for (let i = 0; i < config.output_panel.colormapping.length; i++) {
-            config.output_panel.colormapping[i] = new ColorStop(
-                config.output_panel.colormapping[i].t,
-                config.output_panel.colormapping[i].color,
-            );
-        }
         this.output_panel = new OutputPanel(this, this.config.width, this.config.height, config.output_panel);
         this.output_panel.setup(panels_container);
         this.update();
@@ -195,7 +181,6 @@ class Controller {
 
 }
 
-
 class NoisePanel {
 
     constructor(controller, width, height, index, config={}) {
@@ -204,18 +189,16 @@ class NoisePanel {
         this.panel = null;
         this.context = null;
         this.inputs = [];
-        this.values = null;
+        this.raw_values = [];
+        this.transformed_values = [];
         this.width = width;
         this.height = height;
-        if (this.width == null || this.width == undefined || this.height == null || this.height == undefined) {
-            throw new Error();
-        }
         this.compositor = null;
         this.config = {
             seed: random_seed(),
             period: 64,
             interpolation: "smoother",
-            spline: [new ControlPoint(0, 0), new ControlPoint(1, 1)],
+            spline: [{x: 0, y: 0}, {x: 1, y: 1}],
             harmonics: 0,
             harmonic_spread: 2,
             harmonic_gain: 0.5,
@@ -230,6 +213,14 @@ class NoisePanel {
         }
         for (let key in config) {
             this.config[key] = config[key];
+        }
+        for (let i = 0; i < this.height; i++) {
+            this.raw_values.push([]);
+            this.transformed_values.push([]);
+            for (let j = 0; j < this.width; j++) {
+                this.raw_values[i].push(0);
+                this.transformed_values[i].push(0);
+            }
         }
     }
 
@@ -279,26 +270,26 @@ class NoisePanel {
         let panel_inputs = document.createElement("div");
         panel_inputs.classList.add("panel-inputs");
         this.add_input_group("World", panel_inputs, [
-            new SeedParameterInput(this, "seed", "Seed", 0),
-            new RangeParameterInput(this, "period", "Period", 64, 8, 512, 1),
-            new RangeParameterInput(this, "offset_x", "Offset X", 0, -4*this.width, 4*this.width, 1),
-            new RangeParameterInput(this, "offset_y", "Offset Y", 0, -4*this.height, 4*this.height, 1),
-            new RangeParameterInput(this, "scale_x", "Scale X", 1, 0, 3, 0.01),
-            new RangeParameterInput(this, "scale_y", "Scale Y", 1, 0, 3, 0.01),
-            new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]),
+            new SeedInput(this, "seed", "Seed", 0),
+            new RangeInput(this, "period", "Period", 64, 8, 512, 1),
+            new RangeInput(this, "offset_x", "Offset X", 0, -4*this.width, 4*this.width, 1),
+            new RangeInput(this, "offset_y", "Offset Y", 0, -4*this.height, 4*this.height, 1),
+            new RangeInput(this, "scale_x", "Scale X", 1, 0, 3, 0.01),
+            new RangeInput(this, "scale_y", "Scale Y", 1, 0, 3, 0.01),
+            new SelectInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]),
         ]);
         this.add_input_group("Harmonics", panel_inputs, [
-            new RangeParameterInput(this, "harmonics", "Harmonic Count", 0, 0, 7, 1),
-            new RangeParameterInput(this, "harmonic_spread", "Harmonic Spread", 2, 0, 4, 0.01),
-            new RangeParameterInput(this, "harmonic_gain", "Harmonic Gain", 0.5, 0, 2, 0.01),
+            new RangeInput(this, "harmonics", "Harmonic Count", 0, 0, 7, 1),
+            new RangeInput(this, "harmonic_spread", "Harmonic Spread", 2, 0, 4, 0.01),
+            new RangeInput(this, "harmonic_gain", "Harmonic Gain", 0.5, 0, 2, 0.01),
         ]);
         this.add_input_group("Transform", panel_inputs, [
-            new RangeParameterInput(this, "spread", "Spread", 0, -3, 3, 0.01),
-            new SplineInput(this, "spline", "Spline", [new ControlPoint(0, 0), new ControlPoint(1, 1)]),
+            new RangeInput(this, "spread", "Spread", 0, -3, 3, 0.01),
+            new SplineInput(this, "spline", "Spline", [{x: 0, y: 0}, {x: 1, y: 1}]),
         ]);
         this.add_input_group("Blending", panel_inputs, [
-            new SelectParameterInput(this, "blend_mode", "Blend Mode", "addition", ["addition", "difference", "product", "division", "brighter", "darker"]),
-            new RangeParameterInput(this, "blend_weight", "Blend Weight", 1, 0, 10, 0.01)
+            new SelectInput(this, "blend_mode", "Blend Mode", "addition", ["addition", "difference", "product", "division", "brighter", "darker"]),
+            new RangeInput(this, "blend_weight", "Blend Weight", 1, 0, 10, 0.01)
         ]);
         this.panel.appendChild(panel_inputs);
         let panel_output = container.querySelector(".panel-output");
@@ -309,9 +300,7 @@ class NoisePanel {
         }
     }
 
-    update_values(precook=true) {
-        let spline = new Spline(this.config.spline);
-        if (precook) spline.precook();
+    update_raw_values() {
         let period = this.config.period;
         let amplitude = 1;
         let total_amplitude = 0;
@@ -334,23 +323,33 @@ class NoisePanel {
             total_amplitude += amplitude;
             amplitude *= this.config.harmonic_gain;
         }
-        this.values = [];
         for (let i = 0; i < this.height; i++) {
-            this.values.push([]);
             for (let j = 0; j < this.width; j++) {
-                this.values[i].push(0);
+                let base = 0;
                 amplitude = 1;
                 harmonics.forEach(harmonic => {
-                    this.values[i][j] += amplitude * harmonic.values[i][j];
+                    base += amplitude * harmonic.values[i][j];
                     amplitude *= this.config.harmonic_gain;
                 });
-                let base = this.values[i][j] / total_amplitude;
-                if (this.config.spread != 0) {
-                    base = ((base - 0.5) * 2 ** this.config.spread) + 0.5;
-                }
-                this.values[i][j] = spline.eval(base);
+                base /= total_amplitude;
+                this.raw_values[i][j] = base;
             }
         }
+    }
+
+    update_transformed_values(precook=true) {
+        let spline = new Spline(this.config.spline);
+        if (precook) spline.precook();
+        for (let i = 0; i < this.height; i++) {
+            for (let j = 0; j < this.width; j++) {
+                this.transformed_values[i][j] = spline.eval((this.raw_values[i][j] - 0.5) * 2 ** this.config.spread + 0.5);
+            }
+        }
+    }
+
+    update_values(precook=true) {
+        this.update_raw_values();
+        this.update_transformed_values(precook);
     }
 
     update_canvas() {
@@ -358,7 +357,7 @@ class NoisePanel {
         for (let py = 0; py < this.height; py++) {
             for (let px = 0; px < this.width; px++) {
                 let k = ((py * this.width) + px) * 4;
-                let noise = this.values[py][px];
+                let noise = this.transformed_values[py][px];
                 imagedata.data[k] = 255 * noise;
                 imagedata.data[k + 1] = 255 * noise;
                 imagedata.data[k + 2] = 255 * noise;
@@ -408,7 +407,6 @@ class NoisePanel {
 
 }
 
-
 class OutputPanel {
 
     constructor(controller, width, height, config={}) {
@@ -419,11 +417,10 @@ class OutputPanel {
         this.values = null;
         this.width = width;
         this.height = height;
-        if (this.width == null || this.width == undefined || this.height == null || this.height == undefined) {
-            throw new Error();
-        }
         this.config = {
-            colormapping: [new ColorStop(0, [0, 0, 0, 255]), new ColorStop(1, [255, 255, 255, 255])],
+            palette: [
+                {t: 0, color: [0, 0, 0]},
+                {t: 1, color: [255, 255, 255]}],
         }
         for (let key in config) {
             this.config[key] = config[key];
@@ -449,7 +446,7 @@ class OutputPanel {
         buttons_container.appendChild(button_reset);
 
         let button_add = document.createElement("button");
-        button_add.textContent = "Add noise";
+        button_add.textContent = "Add";
         button_add.addEventListener("click", () => {
             self.controller.add_noise_panel();
         });
@@ -484,7 +481,7 @@ class OutputPanel {
         this.context = this.canvas.getContext("2d");
         let panel_inputs = document.createElement("div");
         panel_inputs.classList.add("panel-inputs");
-        this.inputs.push(new ColorMappingInput(this, "colormapping", "Color Mapping", [new ColorStop(0, [0, 0, 0, 255]), new ColorStop(1, [255, 255, 255, 255])]));
+        this.inputs.push(new PaletteInput(this, "palette", "Palette", [{t: 0, color: [0, 0, 0]}, {t: 1, color: [255, 255, 255]}]));
         this.inputs.forEach(input => {
             input.setup(panel_inputs);
         });
@@ -494,21 +491,21 @@ class OutputPanel {
 
     update(noise_panels, precook=true) {
         let imagedata = new ImageData(this.width, this.height);
-        let mapping = new ColorMapping(this.config.colormapping);
-        if (precook) mapping.precook();
+        let palette = new Palette(this.config.palette);
+        if (precook) palette.precook();
         for (let py = 0; py < this.height; py++) {
             for (let px = 0; px < this.width; px++) {
                 let k = ((py * this.width) + px) * 4;
                 let value = 0;
                 noise_panels.forEach(panel => {
-                    let z = panel.values[py][px];
+                    let z = panel.transformed_values[py][px];
                     value = panel.compositor(value, z, panel.config.blend_weight);
                 });
-                let color = mapping.eval(value);
+                let color = palette.eval(value);
                 imagedata.data[k] = color[0];
                 imagedata.data[k + 1] = color[1];
                 imagedata.data[k + 2] = color[2];
-                imagedata.data[k + 3] = color[3];
+                imagedata.data[k + 3] = 255;
             }
         }
         this.context.putImageData(imagedata, 0, 0);
@@ -528,8 +525,6 @@ class OutputPanel {
     }
 
 }
-
-
 
 var controller;
 

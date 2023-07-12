@@ -1,3 +1,27 @@
+function spiral_index(j, i) {
+    /** @see https://superzhu.gitbooks.io/bigdata/content/algo/get_spiral_index_from_location.html */
+    let index = 0;
+    if (j * j >= i * i) {
+        index = 4 * j * j  - j - i;
+        if (j < i) {
+            index -= 2 * (j - i);
+        }
+    } else {
+        index = 4 * i * i - j - i;
+        if (j < i) {
+            index += 2 * (j - i);
+        }
+    }
+    return index;
+}
+
+function gradient_at(master_seed, j, i) {
+    /** @see https://github.com/davidbau/seedrandom */
+    let local_seed = master_seed + spiral_index(j, i);
+    let prng = (new Math.seedrandom(local_seed))();
+    return rotate({x: 0, y: 1}, prng * 2 * Math.PI);
+}
+
 function interp_linear(t, x0, x1) {
     return (1 - t) * x0 + t * x1;
 }
@@ -62,11 +86,11 @@ class PerlinNoise {
                 let i0 = Math.floor(i);
                 let j1 = j0 + 1;
                 let i1 = i0 + 1;
-                let dot_ul = this.gradients[i0][j0].dot(new Vec2(j - j0, i - i0));
-                let dot_bl = this.gradients[i1][j0].dot(new Vec2(j - j0, i - i1));
+                let dot_ul = dot(this.gradients[i0][j0], {x: j - j0, y: i - i0});
+                let dot_bl = dot(this.gradients[i1][j0], {x: j - j0, y: i - i1});
                 let interp_left = interp(i - i0, dot_ul, dot_bl);
-                let dot_ur = this.gradients[i0][j1].dot(new Vec2(j - j1, i - i0));
-                let dot_br = this.gradients[i1][j1].dot(new Vec2(j - j1, i - i1));
+                let dot_ur = dot(this.gradients[i0][j1], {x: j - j1, y: i - i0});
+                let dot_br = dot(this.gradients[i1][j1], {x: j - j1, y: i - i1});
                 let interp_right = interp(i - i0, dot_ur, dot_br);
                 let interp_vert = (interp(j - j0, interp_left, interp_right) * 0.5) + 0.5;
                 this.values[py].push(interp_vert);

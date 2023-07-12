@@ -73,7 +73,7 @@ class ParameterInput {
 
 }
 
-class RangeParameterInput extends ParameterInput {
+class RangeInput extends ParameterInput {
 
     constructor(reference, name, label, default_value, min, max, step, transform) {
         super(reference, name, label, default_value);
@@ -137,7 +137,7 @@ class RangeParameterInput extends ParameterInput {
 
 }
 
-class SelectParameterInput extends ParameterInput {
+class SelectInput extends ParameterInput {
 
     constructor(reference, name, label, default_value, options) {
         super(reference, name, label, default_value)
@@ -182,7 +182,7 @@ class SelectParameterInput extends ParameterInput {
 
 }
 
-class BooleanParameterInput extends ParameterInput {
+class BooleanInput extends ParameterInput {
 
     constructor(reference, name, label, default_value) {
         super(reference, name, label, default_value);
@@ -215,7 +215,7 @@ class BooleanParameterInput extends ParameterInput {
     }
 }
 
-class SeedParameterInput extends ParameterInput {
+class SeedInput extends ParameterInput {
 
     constructor(reference, name, label, default_value) {
         super(reference, name, label, default_value);

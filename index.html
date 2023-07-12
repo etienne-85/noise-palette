@@ -10,7 +10,7 @@
     <script src="utils.js"></script>
     <script src="params.js"></script>
     <script src="spline.js"></script>
-    <script src="colormapping.js"></script>
+    <script src="palette.js"></script>
     <script src="noise.js"></script>
     <script src="master.js"></script>
     <link rel="stylesheet" href="style.css" />
@@ -35,9 +35,9 @@
                     <label for="input-export-height">Height (px)</label>
                     <input id="input-export-height" min="1" max="3840" step="1" type="number" value="400" />
                 </div>
-                <div class="panel-input">
+                <div class="panel-input panel-input-boolean">
                     <input id="input-export-precook" type="checkbox" checked />
-                    <label for="input-export-precook">Precook</label>
+                    <label for="input-export-precook">Use precooked values</label>
                 </div>
             </div>
             <div class="modal-footer">

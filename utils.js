@@ -1,62 +1,11 @@
-class Vec2 {
-    
-    constructor(x, y) {
-        this.x = x;
-        this.y = y;
-    }
+/** General utilies */
 
-    mult(a) {
-        this.x *= a;
-        this.y *= a;
-        return this;
-    }
-
-    div(a) {
-        this.x /= a;
-        this.y /= a;
-        return this;
-    }
-
-    norm(p=2) {
-        return Math.pow(Math.pow(this.x, p) + Math.pow(this.y, p), 1/p);
-    }
-
-    distance(other) {
-        return this.sub(other).norm();
-    }
-
-    copy() {
-        return new Vec2(this.x, this.y);
-    }
-
-    unit() {
-        return this.copy().div(this.norm());
-    }
-
-    rot(theta) {
-        return new Vec2(
-            this.x * Math.cos(theta) + this.y * Math.sin(theta),
-            -this.x * Math.sin(theta) + this.y * Math.cos(theta));
-    }
-
-    add(other) {
-        return new Vec2(this.x + other.x, this.y + other.y);
-    }
-
-    add_inplace(other) {
-        this.x += other.x;
-        this.y += other.y;
-    }
-
-    sub(other) {
-        // returns this - other
-        return new Vec2(this.x - other.x, this.y - other.y);
-    }
-
-    dot(other) {
-        return this.x * other.x + this.y * other.y;
-    }
-
+function copy_object_array(array) {
+    let out = [];
+    array.forEach(x => {
+        out.push(JSON.parse(JSON.stringify(x)));
+    });
+    return out;
 }
 
 function is_integer(x) {
@@ -64,48 +13,38 @@ function is_integer(x) {
     return x % 1 === 0;
 }
 
-function spiral_index(j, i) {
-    /** @see https://superzhu.gitbooks.io/bigdata/content/algo/get_spiral_index_from_location.html */
-    let index = 0;
-    if (j * j >= i * i) {
-        index = 4 * j * j  - j - i;
-        if (j < i) {
-            index -= 2 * (j - i);
-        }
-    } else {
-        index = 4 * i * i - j - i;
-        if (j < i) {
-            index += 2 * (j - i);
-        }
+function random_seed() {
+    return Math.floor(Math.random() * (2 ** 30));
+}
+
+/** Vector manipulations */
+
+function dot(a, b) {
+    return a.x * b.x + a.y * b.y;
+}
+
+function rotate(vec, theta) {
+    return {
+        x: vec.x * Math.cos(theta) + vec.y * Math.sin(theta),
+        y: -vec.x * Math.sin(theta) + vec.y * Math.cos(theta)
     }
-    return index;
 }
 
-function seed_at(master_seed, j, i) {
-    return master_seed + spiral_index(j, i);
+function distance(a, b) {
+    return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
 }
 
-function gradient_at(master_seed, j, i) {
-    /** @see https://github.com/davidbau/seedrandom */
-    let local_seed = seed_at(master_seed, j, i);
-    let prng = (new Math.seedrandom(local_seed))();
-    return new Vec2(0, 1).rot(prng * 2 * Math.PI);
+function collides(a, b, tol) {
+    if (a == null || b == null) return false;
+    return distance(a, b) < tol;
 }
 
-function obj_arr_cpy(arr) {
-    let out = [];
-    arr.forEach(x => {
-        out.push(x.copy());
-    });
-    return out;
-}
-
+/** Interpolations */
 
 function lerp(P0, P1, x) {
     let t = (x - P0.x) / (P1.x - P0.x);
     return (1 - t) * P0.y + t * P1.y;
 }
-
 
 function cubic_bezier(P0, P1, P2, P3, x, tol=.001) {
     let maxt = 1;
@@ -125,16 +64,9 @@ function cubic_bezier(P0, P1, P2, P3, x, tol=.001) {
     return P0.y * (1 - t) ** 3 + 3 * P1.y * t * (1 - t) ** 2 + 3 * P2.y * (1 - t) * t ** 2 + P3.y * t ** 3;
 }
 
-
-function collides(a, b, tol) {
-    if (a == null || b == null) return false;
-    return a.distance(b) < tol;
-}
-
 function lerp1(t, l, r) {
     return (1 - t) * l + t * r;
 }
-
 
 function lerpN(t, l, r) {
     let out = [];
@@ -144,13 +76,18 @@ function lerpN(t, l, r) {
     return out;
 }
 
-
-function random_seed() {
-    return Math.floor(Math.random() * (2 ** 30));
-}
-
+/** Color manipulations */
 
 function hex_to_rgb(hex) {
-    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16), 255 ];
+}
+
+function rgb_component_to_hex(c) {
+    let hex = c.toString(16);
+    return hex.length == 1 ? "0" + hex : hex;
+}
+
+function rgb_to_hex(rgb) {
+    return "#" + rgb_component_to_hex(rgb[0]) + rgb_component_to_hex(rgb[1]) + rgb_component_to_hex(rgb[2]);
 }

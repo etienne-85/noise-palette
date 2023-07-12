@@ -221,7 +221,7 @@ select option:hover {
     margin-right: .4rem;
 }
 
-.panel-input-colormapping {
+.panel-input-palette {
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -229,18 +229,18 @@ select option:hover {
     overflow: hidden;
 }
 
-.panel-input-colormapping-stops-up,
-.panel-input-colormapping-stops-down {
+.panel-input-palette-stops-up,
+.panel-input-palette-stops-down {
     position: relative;
     width: 336px;
     height: 2rem;
 }
 
-.panel-input-colormapping-stops-up {
+.panel-input-palette-stops-up {
     margin-bottom: .2rem;
 }
 
-.panel-input-colormapping-stops-down {
+.panel-input-palette-stops-down {
     margin-top: .2rem;
 }
 
@@ -334,8 +334,8 @@ select option:hover {
     border-bottom: none;
 }
 
-.panel-input-colormapping.grabbing,
-.panel-input-colormapping.grabbing *{
+.panel-input-palette.grabbing,
+.panel-input-palette.grabbing *{
     cursor: grabbing !important;
 }
 
