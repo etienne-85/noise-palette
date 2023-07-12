@@ -334,6 +334,11 @@ select option:hover {
     border-bottom: none;
 }
 
+.panel-input-colormapping.grabbing,
+.panel-input-colormapping.grabbing *{
+    cursor: grabbing !important;
+}
+
 @media (max-width: 900px) {
     #panels {
         flex-direction: column;

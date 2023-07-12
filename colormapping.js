@@ -106,6 +106,7 @@ class ColorMappingInput extends ParameterInput {
         this.canvas = null;
         this.width = 336;
         this.height = 32;
+        this.wrapper = null;
         this.stops_container_up = null;
         this.stops_container_down = null;
         this.grabbing = null;
@@ -113,6 +114,7 @@ class ColorMappingInput extends ParameterInput {
     }
 
     inflate(wrapper) {
+        this.wrapper = wrapper;
         wrapper.classList.add("panel-input-colormapping");
         this.stops = obj_arr_cpy(this.initial_value);
         this.canvas = document.createElement("canvas");
@@ -137,6 +139,7 @@ class ColorMappingInput extends ParameterInput {
         });
         window.addEventListener("mouseup", (event) => {
             self.grabbing = null;
+            self.wrapper.classList.remove("grabbing");
         });
         wrapper.addEventListener("click", (event) => {
             if (event.button == 0 && event.ctrlKey) {
@@ -186,6 +189,7 @@ class ColorMappingInput extends ParameterInput {
                     if (event.ctrlKey) {
                         self.delete_stop(stop.t);
                     } else {
+                        self.wrapper.classList.add("grabbing");
                         self.grabbing = stop;
                         self.grabstart = event.clientX;
                     }
