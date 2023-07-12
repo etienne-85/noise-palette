@@ -62,7 +62,7 @@ function generate_step_controls(n) {
 
 function generate_contours_controls(n) {
     let width = Math.min(0.05, 1 / n / 4);
-    let controls = [{x: 0, y: 0}, {x: 1, y: 1}];
+    let controls = [{x: 0, y: 0}, {x: 1, y: 0}];
     for (let i = 0; i < n; i++) {
         let x = (i + 1) / (n + 1);
         controls.push({x: x - width, y: 0});
@@ -92,7 +92,7 @@ class SplineInput extends ParameterInput {
         this.controls = null;
         this.canvas = null;
         this.padding = 8;
-        this.width = 256;
+        this.width = 370;
         this.height = 171;
         this.inner_width = this.width - 2 * this.padding;
         this.inner_height = this.height - 2 * this.padding;

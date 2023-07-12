@@ -88,7 +88,10 @@ body {
 
 .panel-canvas {
     border: 1px solid var(--border-dim);
-    image-rendering: crisp-edges;
+}
+
+.panel-hist {
+    border-top: 0;
 }
 
 .panel-inputs {
@@ -207,10 +210,6 @@ select option:hover {
 
 .panel-input-spline {
     overflow: visible;
-}
-
-.panel canvas { 
-    border: 1px solid var(--border-dim);
 }
 
 .panel-buttons > * {

@@ -9,7 +9,7 @@ class Controller {
     constructor(config={}) {
         this.config = {
             width: 400,
-            height: 400
+            height: 300
         };
         for (let key in config) {
             this.config[key] = config[key];
@@ -197,6 +197,11 @@ class NoisePanel {
         this.transformed_values = [];
         this.width = width;
         this.height = height;
+        this.hist_values = [];
+        this.hist_context = null;
+        this.hist_width = this.width;
+        this.hist_height = Math.floor(this.height / 6);
+        this.hist_bin_width = 2;
         this.compositor = null;
         this.config = {
             seed: random_seed(),
@@ -225,6 +230,9 @@ class NoisePanel {
                 this.raw_values[i].push(0);
                 this.transformed_values[i].push(0);
             }
+        }
+        for (let i = 0; i < this.hist_width; i += this.hist_bin_width) {
+            this.hist_values.push(0);
         }
     }
 
@@ -274,6 +282,13 @@ class NoisePanel {
         canvas.height = this.height;
         this.panel.appendChild(canvas);
         this.context = canvas.getContext("2d");
+        let hist_canvas = document.createElement("canvas");
+        hist_canvas.classList.add("panel-canvas");
+        hist_canvas.classList.add("panel-hist");
+        hist_canvas.width = this.hist_width;
+        hist_canvas.height = this.hist_height;
+        this.panel.appendChild(hist_canvas);
+        this.hist_context = hist_canvas.getContext("2d");
         let panel_inputs = document.createElement("div");
         panel_inputs.classList.add("panel-inputs");
         this.add_input_group("World", panel_inputs, [
@@ -347,9 +362,14 @@ class NoisePanel {
     update_transformed_values(precook=true) {
         let spline = new Spline(this.config.spline);
         if (precook) spline.precook();
+        for (let i = 0; i < this.hist_width; i++) {
+            this.hist_values[i] = 0;
+        }
         for (let i = 0; i < this.height; i++) {
             for (let j = 0; j < this.width; j++) {
                 this.transformed_values[i][j] = spline.eval((this.raw_values[i][j] - 0.5) * 2 ** this.config.spread + 0.5);
+                let bin = Math.round(Math.max(0, Math.min(1, this.transformed_values[i][j])) * this.hist_width / this.hist_bin_width);
+                this.hist_values[bin]++;
             }
         }
     }
@@ -367,6 +387,19 @@ class NoisePanel {
             }
         }
         this.context.putImageData(imagedata, 0, 0);
+        this.hist_context.clearRect(0, 0, this.hist_width, this.hist_height);
+        this.hist_context.beginPath();
+        this.hist_context.moveTo(0, 0);
+        let hist_max = Math.max(...this.hist_values);
+        let j = 0;
+        for (let i = 0; i <= this.hist_width; i += this.hist_bin_width) {
+            let y = this.hist_values[j] / hist_max * this.hist_height;
+            this.hist_context.lineTo((i + this.hist_bin_width / 2) - 1, y);
+            j++;
+        }
+        this.hist_context.lineTo(this.hist_width, 0);
+        this.hist_context.lineTo(0, 0);
+        this.hist_context.fill();
     }
 
     update_compositor() {
@@ -431,6 +464,11 @@ class OutputPanel {
         this.values = null;
         this.width = width;
         this.height = height;
+        this.hist_values = [];
+        this.hist_context = null;
+        this.hist_width = this.width;
+        this.hist_height = Math.floor(this.height / 6);
+        this.hist_bin_width = 2;
         this.config = {
             palette: [
                 {t: 0, color: [0, 0, 0]},
@@ -438,6 +476,9 @@ class OutputPanel {
         }
         for (let key in config) {
             this.config[key] = config[key];
+        }
+        for (let i = 0; i < this.hist_width; i += this.hist_bin_width) {
+            this.hist_values.push(0);
         }
     }
 
@@ -493,6 +534,13 @@ class OutputPanel {
         this.canvas.height = this.height;
         panel.appendChild(this.canvas);
         this.context = this.canvas.getContext("2d");
+        let hist_canvas = document.createElement("canvas");
+        hist_canvas.classList.add("panel-canvas");
+        hist_canvas.classList.add("panel-hist");
+        hist_canvas.width = this.hist_width;
+        hist_canvas.height = this.hist_height;
+        panel.appendChild(hist_canvas);
+        this.hist_context = hist_canvas.getContext("2d");
         let panel_inputs = document.createElement("div");
         panel_inputs.classList.add("panel-inputs");
         this.inputs.push(new PaletteInput(this, "palette", "Palette", [{t: 0, color: [0, 0, 0]}, {t: 1, color: [255, 255, 255]}], LEVEL_OUTPUT));
@@ -507,6 +555,9 @@ class OutputPanel {
         let imagedata = new ImageData(this.width, this.height);
         let palette = new Palette(this.config.palette);
         if (precook) palette.precook();
+        for (let i = 0; i < this.hist_width; i++) {
+            this.hist_values[i] = 0;
+        }
         for (let py = 0; py < this.height; py++) {
             for (let px = 0; px < this.width; px++) {
                 let k = ((py * this.width) + px) * 4;
@@ -514,6 +565,8 @@ class OutputPanel {
                 noise_panels.forEach(panel => {
                     let z = panel.transformed_values[py][px];
                     value = panel.compositor(value, z, panel.config.blend_weight);
+                    let bin = Math.round(Math.max(0, Math.min(1, value)) * this.hist_width / this.hist_bin_width);
+                    this.hist_values[bin]++;
                 });
                 let color = palette.eval(value);
                 imagedata.data[k] = color[0];
@@ -523,6 +576,19 @@ class OutputPanel {
             }
         }
         this.context.putImageData(imagedata, 0, 0);
+        this.hist_context.clearRect(0, 0, this.hist_width, this.hist_height);
+        this.hist_context.beginPath();
+        this.hist_context.moveTo(0, 0);
+        let hist_max = Math.max(...this.hist_values);
+        let j = 0;
+        for (let i = 0; i <= this.hist_width; i += this.hist_bin_width) {
+            let y = this.hist_values[j] / hist_max * this.hist_height;
+            this.hist_context.lineTo((i + this.hist_bin_width / 2) - 1, y);
+            j++;
+        }
+        this.hist_context.lineTo(this.hist_width, 0);
+        this.hist_context.lineTo(0, 0);
+        this.hist_context.fill();
     }
 
     get_input_id() {
