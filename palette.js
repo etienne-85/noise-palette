@@ -75,8 +75,8 @@ class PaletteInput extends ParameterInput {
         }
     ]
 
-    constructor(reference, name, label, default_value) {
-        super(reference, name, label, default_value);
+    constructor(reference, name, label, default_value, level) {
+        super(reference, name, label, default_value, level);
         this.stops = null;
         this.context = null;
         this.canvas = null;

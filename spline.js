@@ -73,23 +73,22 @@ function generate_contours_controls(n) {
 }
 
 
-const PRESETS_SPLINES = [
-    { name: "default", value: [{x: 0, y: 0}, {x: 1, y: 1}] },
-    { name: "step1", value: generate_step_controls(1)},
-    { name: "step2", value: generate_step_controls(2)},
-    { name: "step3", value: generate_step_controls(3)},
-    { name: "contrast", value: [{x: 0, y: 0, hr: {x: 1, y: 0}}, {x: 1, y: 1, hl: {x: 0, y: 1}}] },
-    { name: "contours1", value: generate_contours_controls(1) },
-    { name: "contours5", value: generate_contours_controls(5) },
-    { name: "contours11", value: generate_contours_controls(11) },
-    { name: "contours15", value: generate_contours_controls(15) },
-];
-
-
 class SplineInput extends ParameterInput {
 
-    constructor(reference, name, label, default_value) {
-        super(reference, name, label, default_value);
+    PRESETS = [
+        { name: "default", value: [{x: 0, y: 0}, {x: 1, y: 1}] },
+        { name: "step1", value: generate_step_controls(1)},
+        { name: "step2", value: generate_step_controls(2)},
+        { name: "step3", value: generate_step_controls(3)},
+        { name: "contrast", value: [{x: 0, y: 0, hr: {x: 1, y: 0}}, {x: 1, y: 1, hl: {x: 0, y: 1}}] },
+        { name: "contours1", value: generate_contours_controls(1) },
+        { name: "contours5", value: generate_contours_controls(5) },
+        { name: "contours11", value: generate_contours_controls(11) },
+        { name: "contours15", value: generate_contours_controls(15) },
+    ]
+
+    constructor(reference, name, label, default_value, level) {
+        super(reference, name, label, default_value, level);
         this.controls = null;
         this.canvas = null;
         this.padding = 8;
@@ -252,7 +251,7 @@ class SplineInput extends ParameterInput {
     }
 
     on_contextmenu(event) {
-        this.create_context_menu(event, PRESETS_SPLINES);
+        this.create_context_menu(event, this.PRESETS);
     }
 
     draw_control_handle(x0, y0, handle) {

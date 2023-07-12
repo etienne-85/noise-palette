@@ -7,12 +7,13 @@ function clear_context_menus() {
 
 class ParameterInput {
 
-    constructor(reference, name, label, default_value) {
+    constructor(reference, name, label, default_value, level) {
         this.reference = reference;
         this.name = name;
         this.label = label;
-        this.id = null;
         this.default_value = default_value;
+        this.level = level;
+        this.id = null;
         this.initial_value = null;
     }
 
@@ -40,7 +41,7 @@ class ParameterInput {
     update(propagate=true) {
         let value = this.read();
         this.reference.config[this.name] = value;
-        if (propagate) this.reference.on_input_update();
+        if (propagate) this.reference.on_input_update(this.level);
     }
 
     reset() {
@@ -75,8 +76,8 @@ class ParameterInput {
 
 class RangeInput extends ParameterInput {
 
-    constructor(reference, name, label, default_value, min, max, step, transform) {
-        super(reference, name, label, default_value);
+    constructor(reference, name, label, default_value, level, min, max, step, transform) {
+        super(reference, name, label, default_value, level);
         this.input_range = null;
         this.input_number = null;
         this.min = min;
@@ -139,8 +140,8 @@ class RangeInput extends ParameterInput {
 
 class SelectInput extends ParameterInput {
 
-    constructor(reference, name, label, default_value, options) {
-        super(reference, name, label, default_value)
+    constructor(reference, name, label, default_value, level, options) {
+        super(reference, name, label, default_value, level)
         this.select = null;
         this.options = options;
     }
@@ -184,8 +185,8 @@ class SelectInput extends ParameterInput {
 
 class BooleanInput extends ParameterInput {
 
-    constructor(reference, name, label, default_value) {
-        super(reference, name, label, default_value);
+    constructor(reference, name, label, default_value, level) {
+        super(reference, name, label, default_value, level);
         this.input = null;
     }
 
@@ -217,8 +218,8 @@ class BooleanInput extends ParameterInput {
 
 class SeedInput extends ParameterInput {
 
-    constructor(reference, name, label, default_value) {
-        super(reference, name, label, default_value);
+    constructor(reference, name, label, default_value, level) {
+        super(reference, name, label, default_value, level);
         this.input = null;
     }
 
