@@ -283,8 +283,8 @@ class NoisePanel {
             new RangeParameterInput(this, "period", "Period", 64, 8, 512, 1),
             new RangeParameterInput(this, "offset_x", "Offset X", 0, -4*this.width, 4*this.width, 1),
             new RangeParameterInput(this, "offset_y", "Offset Y", 0, -4*this.height, 4*this.height, 1),
-            new RangeParameterInput(this, "scale_x", "Scale X", 1, 0.01, 3, 0.01),
-            new RangeParameterInput(this, "scale_y", "Scale Y", 1, 0.01, 3, 0.01),
+            new RangeParameterInput(this, "scale_x", "Scale X", 1, 0, 3, 0.01),
+            new RangeParameterInput(this, "scale_y", "Scale Y", 1, 0, 3, 0.01),
             new SelectParameterInput(this, "interpolation", "Interpolation", "smoother", ["linear", "smooth", "smoother"]),
         ]);
         this.add_input_group("Harmonics", panel_inputs, [
