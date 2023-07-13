@@ -120,8 +120,9 @@ class PaletteInput extends ParameterInput {
         wrapper.addEventListener("click", (event) => {
             if (event.button == 0 && event.ctrlKey) {
                 let bounds = self.canvas.getBoundingClientRect();
+                let width_scale = self.width / bounds.width;
                 self.stops.push({
-                    t: (event.clientX - bounds.left) / self.width,
+                    t: (event.clientX - bounds.left) / self.width * width_scale,
                     color: [0, 0, 0]
                 });
                 self.update();
