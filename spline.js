@@ -92,7 +92,7 @@ class SplineInput extends ParameterInput {
         this.controls = null;
         this.canvas = null;
         this.padding = 8;
-        this.width = 370;
+        this.width = 371;
         this.height = 171;
         this.inner_width = this.width - 2 * this.padding;
         this.inner_height = this.height - 2 * this.padding;
@@ -104,9 +104,11 @@ class SplineInput extends ParameterInput {
 
     get_click_target(event, collisions=true) {
         let bounds = this.canvas.getBoundingClientRect();
+        let width_scale = this.width / bounds.width;
+        let height_scale = this.height / bounds.height;
         let target = {
-            x: (event.clientX - bounds.left - this.padding) / (this.width - 2 * this.padding),
-            y: 1 - (event.clientY - bounds.top - this.padding) / (this.height - 2 * this.padding),
+            x: (event.clientX - bounds.left - this.padding / width_scale) / (this.width - 2 * this.padding) * width_scale,
+            y: 1 - (event.clientY - bounds.top - this.padding / height_scale) / (this.height - 2 * this.padding) * height_scale,
             control: null,
             handle: null,
         };

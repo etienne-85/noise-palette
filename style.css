@@ -80,10 +80,10 @@ body {
 }
 
 .panel-buttons {
-    margin-bottom: .4rem;
     display: flex;
     flex-direction: row;
     justify-content: flex-start;
+    flex-wrap: wrap;
 }
 
 .panel-canvas {
@@ -208,12 +208,12 @@ select option:hover {
     max-width: 4rem;
 }
 
-.panel-input-spline {
-    overflow: visible;
+.panel-input-spline canvas {
+    width: 100%;
 }
 
 .panel-buttons > * {
-    margin: 0 .4rem 0 0;
+    margin: 0 .4rem .4rem 0;
 }
 
 .panel-buttons > *:last-child {
@@ -228,10 +228,15 @@ select option:hover {
     overflow: hidden;
 }
 
+.panel-input-palette canvas {
+    width: 90%;
+    border: 1px solid var(--border-dim);
+}
+
 .panel-input-palette-stops-up,
 .panel-input-palette-stops-down {
     position: relative;
-    width: 336px;
+    width: 90%;
     height: 2rem;
 }
 
@@ -255,7 +260,7 @@ select option:hover {
     height: 0;
     border-left: .8rem solid transparent;
     border-right: .8rem solid transparent;
-    border-top: 1rem solid black;
+    border-top: 1rem solid var(--text);
     cursor: grab;
 }
 
