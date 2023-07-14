@@ -278,13 +278,14 @@ class NoisePanel {
         this.panel.appendChild(buttons_container);
         let canvas = document.createElement("canvas");
         canvas.classList.add("panel-canvas");
+        canvas.classList.add("panel-canvas-img");
         canvas.width = this.width;
         canvas.height = this.height;
         this.panel.appendChild(canvas);
         this.context = canvas.getContext("2d");
         let hist_canvas = document.createElement("canvas");
         hist_canvas.classList.add("panel-canvas");
-        hist_canvas.classList.add("panel-hist");
+        hist_canvas.classList.add("panel-canvas-hist");
         hist_canvas.width = this.hist_width;
         hist_canvas.height = this.hist_height;
         this.panel.appendChild(hist_canvas);
@@ -530,13 +531,14 @@ class OutputPanel {
 
         this.canvas = document.createElement("canvas");
         this.canvas.classList.add("panel-canvas");
+        this.canvas.classList.add("panel-canvas-img");
         this.canvas.width = this.width;
         this.canvas.height = this.height;
         panel.appendChild(this.canvas);
         this.context = this.canvas.getContext("2d");
         let hist_canvas = document.createElement("canvas");
         hist_canvas.classList.add("panel-canvas");
-        hist_canvas.classList.add("panel-hist");
+        hist_canvas.classList.add("panel-canvas-hist");
         hist_canvas.width = this.hist_width;
         hist_canvas.height = this.hist_height;
         panel.appendChild(hist_canvas);
