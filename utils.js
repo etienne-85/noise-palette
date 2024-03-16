@@ -91,3 +91,5 @@ function rgb_component_to_hex(c) {
 function rgb_to_hex(rgb) {
     return "#" + rgb_component_to_hex(rgb[0]) + rgb_component_to_hex(rgb[1]) + rgb_component_to_hex(rgb[2]);
 }
+
+export {copy_object_array, lerpN, lerp, rgb_to_hex, hex_to_rgb, random_seed, rotate, dot, collides, is_integer }
